@@ -19,40 +19,44 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
-class AdminPanelProvider extends PanelProvider
+class MarketPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->id('admin')
-            ->path('admin')
-            ->brandName('الإدارة')
+            ->default()
+            ->id('market')
+            ->path('market')
+            ->login()
+            ->brandName('المبيعات')
             ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth('full')
             ->colors([
-                'primary' => Color::Slate,
+                'primary' => Color::Amber,
             ])
             ->discoverResources(
-                in: app_path('Filament/Admin/Resources'),
-                for: 'App\\Filament\\Admin\\Resources',
+                in: app_path('Filament/Market/Resources'),
+                for: 'App\\Filament\\Market\\Resources',
             )
             ->discoverPages(
-                in: app_path('Filament/Admin/Pages'),
-                for: 'App\\Filament\\Admin\\Pages',
+                in: app_path('Filament/Market/Pages'),
+                for: 'App\\Filament\\Market\\Pages',
             )
             ->pages([
                 Dashboard::class,
             ])
             ->discoverWidgets(
-                in: app_path('Filament/Admin/Widgets'),
-                for: 'App\\Filament\\Admin\\Widgets',
+                in: app_path('Filament/Market/Widgets'),
+                for: 'App\\Filament\\Market\\Widgets',
             )
             ->widgets([
                 PanelSwitcherWidget::class,
             ])
             ->navigationGroups([
-                NavigationGroup::make('المستخدمون'),
-                NavigationGroup::make('إعدادات النظام'),
+                NavigationGroup::make('فواتير شراء'),
+                NavigationGroup::make('فواتير مبيعات'),
+                NavigationGroup::make('زبائن وموردين'),
+                NavigationGroup::make('مخازن وأصناف'),
             ])
             ->middleware([
                 EncryptCookies::class,

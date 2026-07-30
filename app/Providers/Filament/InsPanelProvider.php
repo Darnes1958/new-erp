@@ -19,40 +19,41 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
-class AdminPanelProvider extends PanelProvider
+class InsPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->id('admin')
-            ->path('admin')
-            ->brandName('الإدارة')
+            ->id('ins')
+            ->path('ins')
+            ->brandName('التقسيط')
             ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth('full')
             ->colors([
-                'primary' => Color::Slate,
+                'primary' => Color::Emerald,
             ])
             ->discoverResources(
-                in: app_path('Filament/Admin/Resources'),
-                for: 'App\\Filament\\Admin\\Resources',
+                in: app_path('Filament/Ins/Resources'),
+                for: 'App\\Filament\\Ins\\Resources',
             )
             ->discoverPages(
-                in: app_path('Filament/Admin/Pages'),
-                for: 'App\\Filament\\Admin\\Pages',
+                in: app_path('Filament/Ins/Pages'),
+                for: 'App\\Filament\\Ins\\Pages',
             )
             ->pages([
                 Dashboard::class,
             ])
             ->discoverWidgets(
-                in: app_path('Filament/Admin/Widgets'),
-                for: 'App\\Filament\\Admin\\Widgets',
+                in: app_path('Filament/Ins/Widgets'),
+                for: 'App\\Filament\\Ins\\Widgets',
             )
             ->widgets([
                 PanelSwitcherWidget::class,
             ])
             ->navigationGroups([
-                NavigationGroup::make('المستخدمون'),
-                NavigationGroup::make('إعدادات النظام'),
+                NavigationGroup::make('عقود التقسيط'),
+                NavigationGroup::make('خصومات ومدفوعات'),
+                NavigationGroup::make('تقارير'),
             ])
             ->middleware([
                 EncryptCookies::class,

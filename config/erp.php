@@ -13,6 +13,7 @@ return [
     */
     'company_connections' => [
         'testERP',
+        'Motafoek',
     ],
 
     /*

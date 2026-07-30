@@ -17,10 +17,15 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(PaymentMethodSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'company' => 'testERP',
-        ]);
+        User::query()->updateOrCreate(
+            ['email' => 'admin@testerp.local'],
+            [
+                'name' => 'Admin',
+                'password' => 'password',
+                'company' => 'testERP',
+                'status' => 1,
+                'is_prog' => true,
+            ],
+        );
     }
 }
