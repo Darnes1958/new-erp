@@ -3,7 +3,7 @@
 namespace App\Filament\Market\Resources\SalesInvoices\Pages;
 
 use App\Filament\Market\Resources\SalesInvoices\SalesInvoiceResource;
-use Filament\Actions\EditAction;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewSalesInvoice extends ViewRecord
@@ -13,7 +13,11 @@ class ViewSalesInvoice extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make(),
+            Action::make('print')
+                ->label('طباعة')
+                ->icon('heroicon-o-printer')
+                ->url(fn (): string => route('pdf.sales-invoice', ['salesInvoice' => $this->getRecord()]))
+                ->openUrlInNewTab(),
         ];
     }
 }

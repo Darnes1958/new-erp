@@ -29,6 +29,7 @@ class InsPanelProvider extends PanelProvider
             ->brandName('التقسيط')
             ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth('full')
+            ->breadcrumbs(false)
             ->colors([
                 'primary' => Color::Emerald,
             ])

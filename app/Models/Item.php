@@ -52,4 +52,34 @@ class Item extends CompanyModel
     {
         return $this->hasMany(ItemPrice::class);
     }
+
+    public static function resolveBuyPrice(int $itemId, int $paymentMethodId): float
+    {
+        $price = ItemPrice::query()
+            ->where('item_id', $itemId)
+            ->where('payment_method_id', $paymentMethodId)
+            ->where('price_kind', 'buy')
+            ->value('price_primary');
+
+        if ($price !== null && (float) $price > 0) {
+            return (float) $price;
+        }
+
+        $default = (float) static::query()->whereKey($itemId)->value('default_buy_price');
+
+        return $default > 0 ? $default : 0.0;
+    }
+
+    public function buyPriceFor(int $paymentMethodId): float
+    {
+        return static::resolveBuyPrice($this->id, $paymentMethodId);
+    }
+
+    public function sellPriceFor(int $paymentMethodId): float
+    {
+        return (float) ($this->prices()
+            ->where('payment_method_id', $paymentMethodId)
+            ->where('price_kind', 'sell')
+            ->value('price_primary') ?? 0);
+    }
 }

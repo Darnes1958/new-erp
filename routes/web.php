@@ -1,7 +1,20 @@
 <?php
 
+use App\Http\Controllers\InvoicePdfController;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    if (auth()->check()) {
+        return redirect(Filament::getPanel('market')->getUrl());
+    }
+
+    return redirect(Filament::getPanel('market')->getLoginUrl());
+});
+
+Route::middleware('auth')->group(function (): void {
+    Route::get('/pdf/purchase-invoice/{purchaseInvoice}', [InvoicePdfController::class, 'purchase'])
+        ->name('pdf.purchase-invoice');
+    Route::get('/pdf/sales-invoice/{salesInvoice}', [InvoicePdfController::class, 'sales'])
+        ->name('pdf.sales-invoice');
 });

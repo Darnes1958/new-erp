@@ -2,8 +2,9 @@
 
 namespace App\Filament\Market\Resources\SalesInvoices\Pages;
 
+use App\Filament\Market\Pages\InpSell\InpSell;
 use App\Filament\Market\Resources\SalesInvoices\SalesInvoiceResource;
-use Filament\Actions\CreateAction;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 
 class ListSalesInvoices extends ListRecords
@@ -13,8 +14,10 @@ class ListSalesInvoices extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
-                ->label('فاتورة بيع جديدة'),
+            Action::make('inp_sell')
+                ->label('فاتورة مبيعات جديدة')
+                ->icon('heroicon-o-plus-circle')
+                ->url(InpSell::getUrl()),
         ];
     }
 }

@@ -2,8 +2,9 @@
 
 namespace App\Filament\Market\Resources\PurchaseInvoices\Pages;
 
+use App\Filament\Market\Pages\InpBuy\InpBuy;
 use App\Filament\Market\Resources\PurchaseInvoices\PurchaseInvoiceResource;
-use Filament\Actions\CreateAction;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 
 class ListPurchaseInvoices extends ListRecords
@@ -13,8 +14,10 @@ class ListPurchaseInvoices extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
-                ->label('فاتورة شراء جديدة'),
+            Action::make('inpBuy')
+                ->label('فاتورة مشتريات جديدة')
+                ->icon('heroicon-o-plus-circle')
+                ->url(fn (): string => InpBuy::getUrl()),
         ];
     }
 }

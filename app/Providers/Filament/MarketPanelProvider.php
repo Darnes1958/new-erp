@@ -2,6 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Market\Pages\InpBuy\InpBuy;
+use App\Filament\Market\Pages\InpSell\InpSell;
+use App\Filament\Market\Support\MarketNavigationGroup;
 use App\Filament\Widgets\PanelSwitcherWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -31,6 +34,7 @@ class MarketPanelProvider extends PanelProvider
             ->brandName('المبيعات')
             ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth('full')
+            ->breadcrumbs(false)
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -44,6 +48,8 @@ class MarketPanelProvider extends PanelProvider
             )
             ->pages([
                 Dashboard::class,
+                InpBuy::class,
+                InpSell::class,
             ])
             ->discoverWidgets(
                 in: app_path('Filament/Market/Widgets'),
@@ -53,10 +59,10 @@ class MarketPanelProvider extends PanelProvider
                 PanelSwitcherWidget::class,
             ])
             ->navigationGroups([
-                NavigationGroup::make('فواتير شراء'),
-                NavigationGroup::make('فواتير مبيعات'),
-                NavigationGroup::make('زبائن وموردين'),
-                NavigationGroup::make('مخازن وأصناف'),
+                NavigationGroup::make(MarketNavigationGroup::PurchaseInvoices),
+                NavigationGroup::make(MarketNavigationGroup::SalesInvoices),
+                NavigationGroup::make(MarketNavigationGroup::CustomersSuppliers),
+                NavigationGroup::make(MarketNavigationGroup::WarehousesItems),
             ])
             ->middleware([
                 EncryptCookies::class,

@@ -1,0 +1,40 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class CompanySetting extends Model
+{
+    public $incrementing = false;
+
+    protected $primaryKey = 'company';
+
+    protected $keyType = 'string';
+
+    protected $fillable = [
+        'company',
+        'has_expiry_dates',
+        'has_dual_unit',
+        'multi_warehouse',
+        'wholesale_retail',
+        'barcode_enabled',
+        'link_sales_to_installments',
+        'auto_price_update',
+        'user_message',
+        'alert_message',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'has_expiry_dates' => 'boolean',
+            'has_dual_unit' => 'boolean',
+            'multi_warehouse' => 'boolean',
+            'wholesale_retail' => 'boolean',
+            'barcode_enabled' => 'boolean',
+            'link_sales_to_installments' => 'boolean',
+            'auto_price_update' => 'boolean',
+        ];
+    }
+}

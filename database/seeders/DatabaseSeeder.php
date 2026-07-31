@@ -15,7 +15,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(PaymentMethodSeeder::class);
+        $this->call([
+            OurCompanySeeder::class,
+            PaymentMethodSeeder::class,
+        ]);
 
         User::query()->updateOrCreate(
             ['email' => 'admin@testerp.local'],

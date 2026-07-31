@@ -29,6 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('الإدارة')
             ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth('full')
+            ->breadcrumbs(false)
             ->colors([
                 'primary' => Color::Slate,
             ])

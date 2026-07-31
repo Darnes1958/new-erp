@@ -23,6 +23,7 @@ class CompanyDataConverter
         $this->target = $target;
 
         $this->steps = [
+            'company_settings' => fn () => $this->convertCompanySettings(),
             'payment_methods' => fn () => $this->convertPaymentMethods(),
             'master' => fn () => $this->convertMasterData(),
             'items' => fn () => $this->convertItems(),
@@ -103,6 +104,43 @@ class CompanyDataConverter
     protected function reseedPaymentMethods(): void
     {
         DB::connection($this->target)->table('payment_methods')->delete();
+    }
+
+    protected function convertCompanySettings(): void
+    {
+        $legacyConnection = config('erp.legacy_auth_connection', 'InsFila');
+
+        if (! config("database.connections.{$legacyConnection}")) {
+            throw new RuntimeException("Legacy auth connection [{$legacyConnection}] is not configured.");
+        }
+
+        $row = DB::connection($legacyConnection)
+            ->table('settings')
+            ->where('company', $this->source)
+            ->first();
+
+        if (! $row) {
+            $this->log("No legacy settings found for [{$this->source}]");
+
+            return;
+        }
+
+        DB::connection(config('database.default'))->table('company_settings')->updateOrInsert(
+            ['company' => $this->target],
+            [
+                'has_expiry_dates' => (bool) ((int) ($row->has_exp ?? 0)),
+                'has_dual_unit' => (bool) ((int) ($row->has_two ?? 0)),
+                'multi_warehouse' => (bool) ((int) ($row->many_place ?? 0)),
+                'wholesale_retail' => (bool) ((int) ($row->jomla ?? 0)),
+                'barcode_enabled' => (bool) ((int) ($row->barcode ?? 0)),
+                'link_sales_to_installments' => (bool) ((int) ($row->is_together ?? 0)),
+                'auto_price_update' => false,
+                'user_message' => null,
+                'alert_message' => $row->alertMessage ?? null,
+            ],
+        );
+
+        $this->log("Company settings migrated: {$this->source} -> {$this->target}");
     }
 
     protected function convertPaymentMethods(): void

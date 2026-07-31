@@ -27,4 +27,23 @@ return [
         'installment' => 3,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Number display locale (Libya — Western digits 0-9)
+    |--------------------------------------------------------------------------
+    |
+    | Arabic locales (ar, ar_LY) render Eastern digits (٠-٩) by default.
+    | en_US keeps Western digits with comma thousands and period decimals
+    | (e.g. 1,234.567).
+    |
+    */
+    'number_locale' => 'en_US',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Legacy central database (users, settings, permissions)
+    |--------------------------------------------------------------------------
+    */
+    'legacy_auth_connection' => env('ERP_LEGACY_AUTH_CONNECTION', 'InsFila'),
+
 ];
