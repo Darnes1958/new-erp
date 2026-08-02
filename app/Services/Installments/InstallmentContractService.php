@@ -9,12 +9,17 @@ use App\Models\InstallmentDeduction;
 use App\Models\InstallmentSurplus;
 use App\Models\InstallmentSuspended;
 use App\Models\SalesInvoice;
+use App\Services\Installments\InstallmentContractMetricsService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class InstallmentContractService
 {
+    public function __construct(
+        protected InstallmentContractMetricsService $metrics,
+    ) {}
+
     public static function nextContractId(): int
     {
         $activeMax = (int) (InstallmentContract::query()->max('id') ?? 0);
@@ -119,7 +124,7 @@ class InstallmentContractService
                 ->value('payroll_bank_id');
         }
 
-        return InstallmentContract::query()->create([
+        $contract = InstallmentContract::query()->create([
             'id' => $contractId,
             'customer_id' => (int) ($data['customer_id'] ?? $invoice->customer_id),
             'installment_bank_id' => $installmentBankId,
@@ -135,10 +140,20 @@ class InstallmentContractService
             'sales_invoice_id' => $invoice->id,
             'cheques_in' => (int) ($data['cheques_in'] ?? 0),
             'cheques_out' => 0,
+            'next_installment_date' => InstallmentContractMetricsService::initialNextInstallmentDate(
+                $data['contract_start'] ?? now()->toDateString()
+            ),
+            'late_amount' => 0,
             'installments_remaining' => $installmentCount,
+            'surplus_count' => 0,
+            'surplus_amount' => 0,
+            'suspended_count' => 0,
+            'suspended_amount' => 0,
             'notes' => $data['notes'] ?? null,
             'created_by' => Auth::id(),
         ]);
+
+        return $contract;
     }
 
     public function previousCustomerContract(int $customerId): ?InstallmentContract

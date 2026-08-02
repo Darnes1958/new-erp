@@ -14,7 +14,7 @@ class InstallmentContractInfolist
             Section::make('بيانات العقد')->schema([
                 TextEntry::make('id')->label('رقم العقد'),
                 TextEntry::make('customer.name')->label('الزبون'),
-                TextEntry::make('installmentBank.name')->label('البنك'),
+                TextEntry::make('installmentBank.name')->label('المصرف'),
                 TextEntry::make('workplace.name')->label('جهة العمل'),
                 TextEntry::make('bank_account_number')->label('رقم الحساب'),
                 TextEntry::make('contract_start')->label('بداية العقد')->date(),

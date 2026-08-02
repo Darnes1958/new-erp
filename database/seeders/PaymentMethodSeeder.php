@@ -14,7 +14,7 @@ class PaymentMethodSeeder extends Seeder
     {
         $methods = [
             ['id' => 1, 'name' => 'نقدي', 'code' => 'cash'],
-            ['id' => 2, 'name' => 'بنكي', 'code' => 'bank'],
+            ['id' => 2, 'name' => 'مصرفي', 'code' => 'bank'],
             ['id' => 3, 'name' => 'تقسيط', 'code' => 'installment'],
         ];
 

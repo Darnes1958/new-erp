@@ -46,4 +46,16 @@ return [
     */
     'legacy_auth_connection' => env('ERP_LEGACY_AUTH_CONNECTION', 'InsFila'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Installment schedule
+    |--------------------------------------------------------------------------
+    |
+    | Denormalized contract fields (next_installment_date, late_amount, …) are
+    | recalculated by InstallmentContractMetricsService. late_amount is refreshed
+    | monthly via erp:refresh-installment-late-counts.
+    |
+    */
+    'installment_due_day' => 28,
+
 ];

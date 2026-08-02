@@ -3,6 +3,14 @@
 namespace App\Providers;
 
 use App\Http\Responses\MarketPanelLoginResponse;
+use App\Models\InstallmentContract;
+use App\Models\InstallmentContractArchive;
+use App\Models\InstallmentDeduction;
+use App\Models\WrongDeduction;
+use App\Models\InstallmentSurplus;
+use App\Models\InstallmentSuspended;
+use App\Observers\InstallmentContractableMetricsObserver;
+use App\Observers\InstallmentDeductionObserver;
 use App\Support\PdfChrome;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Filament\Schemas\Schema;
@@ -10,6 +18,7 @@ use Filament\Support\Facades\FilamentView;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Number;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Browsershot\Browsershot;
@@ -30,6 +39,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Aliases for converted installment morph types only; other models (e.g. User) keep full class names.
+        Relation::morphMap([
+            'installment_contract' => InstallmentContract::class,
+            'installment_contract_archive' => InstallmentContractArchive::class,
+            'wrong_deduction' => WrongDeduction::class,
+        ]);
+
         Pdf::default()
             ->footerView('pdf.footer')
             ->margins(10, 10, 10, 10)
@@ -82,5 +98,9 @@ class AppServiceProvider extends ServiceProvider
             PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
             fn (): string => Blade::render('@livewire(\'company-switcher\')'),
         );
+
+        InstallmentDeduction::observe(InstallmentDeductionObserver::class);
+        InstallmentSurplus::observe(InstallmentContractableMetricsObserver::class);
+        InstallmentSuspended::observe(InstallmentContractableMetricsObserver::class);
     }
 }

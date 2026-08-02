@@ -30,7 +30,7 @@ class InstallmentContractsTable
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('installmentBank.name')
-                    ->label('البنك')
+                    ->label('المصرف')
                     ->sortable(),
                 TextColumn::make('contract_total')
                     ->label('قيمة العقد')
@@ -55,7 +55,7 @@ class InstallmentContractsTable
             ->striped()
             ->filters([
                 SelectFilter::make('installment_bank_id')
-                    ->label('البنك')
+                    ->label('المصرف')
                     ->relationship('installmentBank', 'name'),
             ])
             ->recordActions([

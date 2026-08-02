@@ -20,6 +20,7 @@ class CompanySetting extends Model
         'wholesale_retail',
         'barcode_enabled',
         'link_sales_to_installments',
+        'installment_by_payroll_bank',
         'auto_price_update',
         'user_message',
         'alert_message',
@@ -34,6 +35,7 @@ class CompanySetting extends Model
             'wholesale_retail' => 'boolean',
             'barcode_enabled' => 'boolean',
             'link_sales_to_installments' => 'boolean',
+            'installment_by_payroll_bank' => 'boolean',
             'auto_price_update' => 'boolean',
         ];
     }
