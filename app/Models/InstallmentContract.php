@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class InstallmentContract extends CompanyModel
 {
@@ -68,8 +69,23 @@ class InstallmentContract extends CompanyModel
         return $this->belongsTo(SalesInvoice::class);
     }
 
+    public function payrollBank(): BelongsTo
+    {
+        return $this->belongsTo(PayrollBank::class);
+    }
+
     public function deductions(): HasMany
     {
         return $this->hasMany(InstallmentDeduction::class);
+    }
+
+    public function surpluses(): MorphMany
+    {
+        return $this->morphMany(InstallmentSurplus::class, 'contractable');
+    }
+
+    public function suspendedEntries(): MorphMany
+    {
+        return $this->morphMany(InstallmentSuspended::class, 'contractable');
     }
 }

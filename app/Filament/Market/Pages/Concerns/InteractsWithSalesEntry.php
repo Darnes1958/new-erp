@@ -33,6 +33,16 @@ trait InteractsWithSalesEntry
         return false;
     }
 
+    public function locksPaymentMethod(): bool
+    {
+        return false;
+    }
+
+    public function usesMinimalSalesHeader(): bool
+    {
+        return false;
+    }
+
     public function usesInstallmentMarkup(): bool
     {
         $paymentMethodId = (int) ($this->headerData['payment_method_id'] ?? $this->work->payment_method_id ?? 1);
@@ -69,17 +79,27 @@ trait InteractsWithSalesEntry
     {
         $state = $this->headerForm->getState();
         $subtotal = (float) $this->work->lines_subtotal;
-        $extraCost = (float) ($state['extra_cost'] ?? 0);
-        $discount = (float) ($state['discount'] ?? 0);
-        $rateMarkup = (float) ($state['rate_markup'] ?? 0);
-        $entryPaid = (float) ($state['amount_paid'] ?? 0);
-        $paymentMethodId = (int) ($state['payment_method_id'] ?? $this->work->payment_method_id ?? 1);
 
-        $differenceAmount = $paymentMethodId === 3
-            ? ($subtotal + $extraCost) * $rateMarkup / 100
-            : 0;
+        if ($this->usesMinimalSalesHeader()) {
+            $extraCost = 0;
+            $discount = 0;
+            $rateMarkup = 0;
+            $entryPaid = 0;
+            $differenceAmount = 0;
+            $grandTotal = $subtotal;
+        } else {
+            $extraCost = (float) ($state['extra_cost'] ?? 0);
+            $discount = (float) ($state['discount'] ?? 0);
+            $rateMarkup = (float) ($state['rate_markup'] ?? 0);
+            $entryPaid = (float) ($state['amount_paid'] ?? 0);
+            $paymentMethodId = (int) ($state['payment_method_id'] ?? $this->work->payment_method_id ?? 1);
 
-        $grandTotal = $subtotal + $extraCost - $discount + $differenceAmount;
+            $differenceAmount = $paymentMethodId === 3
+                ? ($subtotal + $extraCost) * $rateMarkup / 100
+                : 0;
+
+            $grandTotal = $subtotal + $extraCost - $discount + $differenceAmount;
+        }
 
         $this->work->fill([
             ...$state,
@@ -150,12 +170,24 @@ trait InteractsWithSalesEntry
 
     public function fillLineForItem(int $itemId, ?string $barcode): void
     {
-        $item = Item::query()->findOrFail($itemId);
-        $unitPrice = Item::query()->find($itemId)?->sellPriceFor($this->currentPaymentMethodId()) ?? 0;
         $warehouseId = $this->currentWarehouseId();
-        $stock = $warehouseId
-            ? app(SalesInventoryService::class)->warehouseStockQty($itemId, $warehouseId)
-            : 0;
+
+        if (! $warehouseId) {
+            Notification::make()->title('يجب اختيار مخزن')->warning()->send();
+
+            return;
+        }
+
+        $stock = app(SalesInventoryService::class)->warehouseStockQty($itemId, $warehouseId);
+
+        if ($stock <= 0) {
+            Notification::make()->title('الصنف غير مخزون في نقطة البيع هذه')->warning()->send();
+
+            return;
+        }
+
+        $item = Item::query()->findOrFail($itemId);
+        $unitPrice = $item->sellPriceFor($this->currentPaymentMethodId()) ?? 0;
 
         $existing = SalesInvoiceLineWork::query()
             ->where('sales_invoice_work_id', Auth::id())
@@ -308,11 +340,11 @@ trait InteractsWithSalesEntry
                     ->sortable(),
                 TextColumn::make('unit_price_primary')
                     ->label('السعر')
-                    ->numeric(decimalPlaces: 3)
+                    ->numeric(3)
                     ->sortable(),
                 TextColumn::make('line_total')
                     ->label('المجموع')
-                    ->numeric(decimalPlaces: 3)
+                    ->numeric(3)
                     ->sortable(),
             ])
             ->recordActions([

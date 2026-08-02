@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SalesInvoice extends CompanyModel
 {
@@ -64,6 +65,27 @@ class SalesInvoice extends CompanyModel
     public function lines(): HasMany
     {
         return $this->hasMany(SalesInvoiceLine::class);
+    }
+
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(CustomerReceipt::class);
+    }
+
+    public function installmentContract(): HasOne
+    {
+        return $this->hasOne(InstallmentContract::class);
+    }
+
+    public function installmentContractArchive(): HasOne
+    {
+        return $this->hasOne(InstallmentContractArchive::class);
+    }
+
+    public function hasInstallmentContract(): bool
+    {
+        return $this->installmentContract()->exists()
+            || $this->installmentContractArchive()->exists();
     }
 
     public function recalculateTotals(): void

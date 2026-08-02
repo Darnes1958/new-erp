@@ -81,6 +81,9 @@ class SalesHeaderForm
                     ->default(1)
                     ->relationship('paymentMethod', 'name')
                     ->required()
+                    ->disabled(fn () => $page->locksPaymentMethod())
+                    ->dehydrated()
+                    ->visible(fn () => ! $page->usesMinimalSalesHeader())
                     ->afterStateUpdated(function ($state) use ($page): void {
                         $page->work->payment_method_id = $state;
                         $page->work->save();
@@ -88,22 +91,29 @@ class SalesHeaderForm
                         $page->refreshPaymentTotals();
                     })
                     ->id('payment_method_id'),
+                Hidden::make('payment_method_id')
+                    ->visible(fn () => $page->usesMinimalSalesHeader()),
                 Toggle::make('is_retail')
                     ->label('بيع قطاعي')
                     ->columnSpan(2)
                     ->inlineLabel()
                     ->default(true)
                     ->live()
+                    ->visible(fn () => ! $page->usesMinimalSalesHeader())
                     ->afterStateUpdated(function ($state) use ($page): void {
                         $page->work->is_retail = (bool) $state;
                         $page->work->save();
                         $page->refreshLineSellPrice();
                     }),
+                Hidden::make('is_retail')
+                    ->default(true)
+                    ->visible(fn () => $page->usesMinimalSalesHeader()),
                 TextInput::make('lines_subtotal')
                     ->label('اجمالي البنود')
                     ->columnSpan(2)
                     ->inlineLabel()
-                    ->readOnly(),
+                    ->readOnly()
+                    ->visible(fn () => ! $page->usesMinimalSalesHeader()),
                 TextInput::make('extra_cost')
                     ->label('تكاليف إضافية')
                     ->columnSpan(2)
@@ -111,6 +121,7 @@ class SalesHeaderForm
                     ->numeric()
                     ->default(0)
                     ->live(onBlur: true)
+                    ->visible(fn () => ! $page->usesMinimalSalesHeader())
                     ->afterStateUpdated(fn () => $page->refreshPaymentTotals()),
                 TextInput::make('rate_markup')
                     ->label('النسبة %')
@@ -118,7 +129,7 @@ class SalesHeaderForm
                     ->inlineLabel()
                     ->numeric()
                     ->default(0)
-                    ->visible(fn () => $page->usesInstallmentMarkup())
+                    ->visible(fn () => ! $page->usesMinimalSalesHeader() && $page->usesInstallmentMarkup())
                     ->live(onBlur: true)
                     ->afterStateUpdated(fn () => $page->refreshPaymentTotals()),
                 TextInput::make('difference_amount')
@@ -126,7 +137,7 @@ class SalesHeaderForm
                     ->columnSpan(2)
                     ->inlineLabel()
                     ->readOnly()
-                    ->visible(fn () => $page->usesInstallmentMarkup()),
+                    ->visible(fn () => ! $page->usesMinimalSalesHeader() && $page->usesInstallmentMarkup()),
                 TextInput::make('discount')
                     ->label('خصم')
                     ->columnSpan(2)
@@ -134,6 +145,7 @@ class SalesHeaderForm
                     ->numeric()
                     ->default(0)
                     ->live(onBlur: true)
+                    ->visible(fn () => ! $page->usesMinimalSalesHeader())
                     ->extraInputAttributes(['wire:keydown.enter' => 'updatePay'])
                     ->afterStateUpdated(fn () => $page->refreshPaymentTotals()),
                 TextInput::make('amount_paid')
@@ -143,19 +155,21 @@ class SalesHeaderForm
                     ->numeric()
                     ->default(0)
                     ->live(onBlur: true)
+                    ->visible(fn () => ! $page->usesMinimalSalesHeader())
                     ->helperText(fn () => $page->isEditMode() ? 'المدفوع أثناء إدخال الفاتورة فقط' : null)
                     ->extraInputAttributes(['wire:keydown.enter' => 'updatePay'])
                     ->afterStateUpdated(fn () => $page->refreshPaymentTotals()),
                 TextInput::make('grand_total')
                     ->label('الإجمالي')
-                    ->columnSpan(2)
+                    ->columnSpan(fn () => $page->usesMinimalSalesHeader() ? 3 : 2)
                     ->inlineLabel()
                     ->readOnly(),
                 TextInput::make('balance')
                     ->label('المتبقي')
                     ->columnSpan(2)
                     ->inlineLabel()
-                    ->readOnly(),
+                    ->readOnly()
+                    ->visible(fn () => ! $page->usesMinimalSalesHeader()),
                 TextInput::make('notes')
                     ->hiddenLabel()
                     ->prefix('ملاحظات')
