@@ -378,11 +378,11 @@ trait InteractsWithPurchaseEntry
                     ->sortable(),
                 TextColumn::make('unit_cost_primary')
                     ->label('سعر الشراء')
-                    ->numeric(decimalPlaces: 3)
+                    ->numeric(3)
                     ->sortable(),
                 TextColumn::make('line_cost_total')
                     ->label('المجموع')
-                    ->numeric(decimalPlaces: 3)
+                    ->numeric(3)
                     ->sortable(),
             ])
             ->recordActions([

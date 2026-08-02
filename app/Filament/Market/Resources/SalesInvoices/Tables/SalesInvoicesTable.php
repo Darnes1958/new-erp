@@ -2,14 +2,18 @@
 
 namespace App\Filament\Market\Resources\SalesInvoices\Tables;
 
+use App\Filament\Market\Resources\SalesInvoices\Pages\EditSell;
+use App\Filament\Market\Resources\SalesInvoices\Pages\SalesReturnEntry;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use Filament\Tables\Columns\IconColumn;
+use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class SalesInvoicesTable
 {
@@ -29,23 +33,16 @@ class SalesInvoicesTable
                     ->label('التاريخ')
                     ->date()
                     ->sortable(),
-                TextColumn::make('lines_subtotal')
-                    ->label('إجمالي البنود')
-                    ->numeric(decimalPlaces: 3)
-                    ->sortable(),
                 TextColumn::make('grand_total')
                     ->label('الإجمالي')
-                    ->numeric(decimalPlaces: 3)
+                    ->numeric(3)
                     ->sortable(),
                 TextColumn::make('amount_paid')
                     ->label('المدفوع')
-                    ->numeric(decimalPlaces: 3),
+                    ->numeric(3),
                 TextColumn::make('balance')
                     ->label('الباقي')
-                    ->numeric(decimalPlaces: 3),
-                IconColumn::make('is_retail')
-                    ->label('مفرد')
-                    ->boolean(),
+                    ->numeric(3),
                 TextColumn::make('warehouse.name')
                     ->label('المخزن')
                     ->toggleable(),
@@ -55,10 +52,36 @@ class SalesInvoicesTable
             ->filters([
                 SelectFilter::make('customer_id')
                     ->label('الزبون')
-                    ->relationship('customer', 'name'),
+                    ->relationship('customer', 'name')
+                    ->searchable()
+                    ->preload(),
                 SelectFilter::make('warehouse_id')
                     ->label('المخزن')
                     ->relationship('warehouse', 'name'),
+                TernaryFilter::make('is_retail')
+                    ->label('بيع قطاعي')
+                    ->placeholder('الكل')
+                    ->trueLabel('قطاعي')
+                    ->falseLabel('جملة'),
+                Filter::make('invoice_date')
+                    ->label('التاريخ')
+                    ->schema([
+                        DatePicker::make('date_from')
+                            ->label('من تاريخ'),
+                        DatePicker::make('date_to')
+                            ->label('إلى تاريخ'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['date_from'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('invoice_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['date_to'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('invoice_date', '<=', $date),
+                            );
+                    }),
             ])
             ->recordActions([
                 ViewAction::make()->iconButton(),
@@ -68,7 +91,19 @@ class SalesInvoicesTable
                     ->iconButton()
                     ->url(fn ($record): string => route('pdf.sales-invoice', ['salesInvoice' => $record]))
                     ->openUrlInNewTab(),
-                EditAction::make()->iconButton(),
+                Action::make('edit_sell')
+                    ->label('تعديل')
+                    ->icon('heroicon-m-pencil')
+                    ->iconButton()
+                    ->color('info')
+                    ->url(fn ($record): string => EditSell::getUrl(['record' => $record])),
+                Action::make('sales_return')
+                    ->label('ترجيع')
+                    ->icon('heroicon-m-arrow-uturn-left')
+                    ->iconButton()
+                    ->color('primary')
+                    ->tooltip('ترجيع')
+                    ->url(fn ($record): string => SalesReturnEntry::getUrl(['record' => $record])),
                 DeleteAction::make()->iconButton(),
             ]);
     }

@@ -17,4 +17,6 @@ Route::middleware('auth')->group(function (): void {
         ->name('pdf.purchase-invoice');
     Route::get('/pdf/sales-invoice/{salesInvoice}', [InvoicePdfController::class, 'sales'])
         ->name('pdf.sales-invoice');
+    Route::get('/pdf/sales-offer-invoice/{salesOfferInvoice}', [InvoicePdfController::class, 'salesOffer'])
+        ->name('pdf.sales-offer-invoice');
 });

@@ -5,6 +5,7 @@ namespace App\Services\Pdf;
 use App\Models\OurCompany;
 use App\Models\PurchaseInvoice;
 use App\Models\SalesInvoice;
+use App\Models\SalesOfferInvoice;
 use App\Support\CompanySettings;
 use Spatie\LaravelPdf\Facades\Pdf;
 use Spatie\LaravelPdf\PdfBuilder;
@@ -36,6 +37,20 @@ class InvoicePdfService
             'repDate' => now()->toDateString(),
         ])
             ->name("sales-invoice-{$invoice->id}.pdf")
+            ->download();
+    }
+
+    public function salesOfferInvoice(SalesOfferInvoice $invoice): PdfBuilder
+    {
+        $invoice->load(['customer', 'warehouse', 'lines.item']);
+
+        return Pdf::view('pdf.sales-offer-invoice', [
+            'invoice' => $invoice,
+            'company' => OurCompany::forCurrentUser(),
+            'hasDualUnit' => CompanySettings::hasDualUnit(),
+            'repDate' => now()->toDateString(),
+        ])
+            ->name("sales-offer-invoice-{$invoice->id}.pdf")
             ->download();
     }
 }

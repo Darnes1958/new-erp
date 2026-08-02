@@ -38,7 +38,7 @@ class ItemsTable
                     ->boolean(),
                 TextColumn::make('default_buy_price')
                     ->label('سعر الشراء')
-                    ->numeric(decimalPlaces: 3),
+                    ->numeric(3),
                 IconColumn::make('is_active')
                     ->label('نشط')
                     ->boolean(),

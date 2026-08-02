@@ -40,4 +40,9 @@ class SalesInvoiceLine extends CompanyModel
     {
         return $this->belongsTo(Item::class);
     }
+
+    public function salesReturn(): BelongsTo
+    {
+        return $this->belongsTo(SalesReturn::class);
+    }
 }

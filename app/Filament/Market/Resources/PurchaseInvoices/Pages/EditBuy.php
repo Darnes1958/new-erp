@@ -198,14 +198,12 @@ class EditBuy extends Page implements HasSchemas, HasTable
             return;
         }
 
-        $this->invoice->refresh();
-        $this->initializeWorkDraft();
-        $this->loadInvoiceIntoWork();
-
         Notification::make()
             ->title('تم حفظ التعديلات بنجاح')
             ->success()
             ->send();
+
+        $this->redirect(PurchaseInvoiceResource::getUrl('index'));
     }
 
     public function clearDraft(): void

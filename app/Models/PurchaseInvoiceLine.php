@@ -48,4 +48,9 @@ class PurchaseInvoiceLine extends CompanyModel
     {
         return $this->belongsTo(Item::class);
     }
+
+    public function purchaseReturn(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseReturn::class);
+    }
 }

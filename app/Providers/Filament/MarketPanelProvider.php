@@ -4,6 +4,9 @@ namespace App\Providers\Filament;
 
 use App\Filament\Market\Pages\InpBuy\InpBuy;
 use App\Filament\Market\Pages\InpSell\InpSell;
+use App\Filament\Market\Pages\InpSellOffer\InpSellOffer;
+use App\Filament\Market\Pages\ListSalesReturns;
+use App\Filament\Market\Pages\QuickSell\QuickSell;
 use App\Filament\Market\Support\MarketNavigationGroup;
 use App\Filament\Widgets\PanelSwitcherWidget;
 use Filament\Http\Middleware\Authenticate;
@@ -50,6 +53,9 @@ class MarketPanelProvider extends PanelProvider
                 Dashboard::class,
                 InpBuy::class,
                 InpSell::class,
+                QuickSell::class,
+                InpSellOffer::class,
+                ListSalesReturns::class,
             ])
             ->discoverWidgets(
                 in: app_path('Filament/Market/Widgets'),
@@ -63,6 +69,7 @@ class MarketPanelProvider extends PanelProvider
                 NavigationGroup::make(MarketNavigationGroup::SalesInvoices),
                 NavigationGroup::make(MarketNavigationGroup::CustomersSuppliers),
                 NavigationGroup::make(MarketNavigationGroup::WarehousesItems),
+                NavigationGroup::make(MarketNavigationGroup::ReceiptsAndPayments),
             ])
             ->middleware([
                 EncryptCookies::class,

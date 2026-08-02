@@ -6,6 +6,7 @@ use App\Filament\Market\Resources\PurchaseInvoices\Pages\CreatePurchaseInvoice;
 use App\Filament\Market\Resources\PurchaseInvoices\Pages\EditBuy;
 use App\Filament\Market\Resources\PurchaseInvoices\Pages\EditPurchaseInvoice;
 use App\Filament\Market\Resources\PurchaseInvoices\Pages\ListPurchaseInvoices;
+use App\Filament\Market\Resources\PurchaseInvoices\Pages\PurchaseReturnEntry;
 use App\Filament\Market\Resources\PurchaseInvoices\Pages\ViewPurchaseInvoice;
 use App\Filament\Market\Resources\PurchaseInvoices\Schemas\PurchaseInvoiceForm;
 use App\Filament\Market\Resources\PurchaseInvoices\Schemas\PurchaseInvoiceInfolist;
@@ -60,6 +61,7 @@ class PurchaseInvoiceResource extends Resource
             'view' => ViewPurchaseInvoice::route('/{record}'),
             'edit' => EditPurchaseInvoice::route('/{record}/edit'),
             'edit-buy' => EditBuy::route('/{record}/edit-buy'),
+            'purchase-return' => PurchaseReturnEntry::route('/{record}/purchase-return'),
         ];
     }
 }

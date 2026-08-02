@@ -31,10 +31,10 @@ class PurchaseLineForm
                     ->hiddenLabel()
                     ->prefix('الباركود')
                     ->columnSpanFull()
-                    ->live(onBlur: true)
-                    ->afterStateUpdated(fn ($state) => $page->checkBarcode($state))
-                    ->extraAttributes(['wire:keydown.enter.prevent' => 'submitBarcode'])
                     ->autocomplete(false)
+                    ->extraInputAttributes([
+                        'wire:keydown.enter' => 'checkBarcode($event.target.value)',
+                    ])
                     ->id('barcode'),
                 Select::make('item_id')
                     ->hiddenLabel()

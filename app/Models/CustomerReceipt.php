@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\ReceiptTransactionKind;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class CustomerReceipt extends CompanyModel
 {
     protected $fillable = [
@@ -24,6 +27,37 @@ class CustomerReceipt extends CompanyModel
     {
         return [
             'receipt_date' => 'date',
+            'transaction_kind' => ReceiptTransactionKind::class,
         ];
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function salesInvoice(): BelongsTo
+    {
+        return $this->belongsTo(SalesInvoice::class);
+    }
+
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class);
+    }
+
+    public function cashBox(): BelongsTo
+    {
+        return $this->belongsTo(CashBox::class);
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 }

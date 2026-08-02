@@ -9,6 +9,7 @@ use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceLine;
 use App\Models\SalesInvoiceLineWork;
 use App\Models\SalesInvoiceWork;
+use App\Support\ProgrammingError;
 use App\Services\Inventory\SalesInventoryService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -19,6 +20,7 @@ use Filament\Tables\Contracts\HasTable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use Throwable;
 
 class InpSell extends Page implements HasSchemas, HasTable
 {
@@ -253,8 +255,8 @@ class InpSell extends Page implements HasSchemas, HasTable
                     ->where('sales_invoice_work_id', Auth::id())
                     ->delete();
             });
-        } catch (RuntimeException $exception) {
-            Notification::make()->title($exception->getMessage())->danger()->send();
+        } catch (Throwable $exception) {
+            ProgrammingError::notify($exception);
 
             return;
         }

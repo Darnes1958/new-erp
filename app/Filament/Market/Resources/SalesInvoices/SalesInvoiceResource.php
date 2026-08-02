@@ -2,9 +2,11 @@
 
 namespace App\Filament\Market\Resources\SalesInvoices;
 
+use App\Filament\Market\Resources\SalesInvoices\Pages\EditSell;
 use App\Filament\Market\Resources\SalesInvoices\Pages\CreateSalesInvoice;
 use App\Filament\Market\Resources\SalesInvoices\Pages\EditSalesInvoice;
 use App\Filament\Market\Resources\SalesInvoices\Pages\ListSalesInvoices;
+use App\Filament\Market\Resources\SalesInvoices\Pages\SalesReturnEntry;
 use App\Filament\Market\Resources\SalesInvoices\Pages\ViewSalesInvoice;
 use App\Filament\Market\Resources\SalesInvoices\Schemas\SalesInvoiceForm;
 use App\Filament\Market\Resources\SalesInvoices\Schemas\SalesInvoiceInfolist;
@@ -58,6 +60,8 @@ class SalesInvoiceResource extends Resource
             'create' => CreateSalesInvoice::route('/create'),
             'view' => ViewSalesInvoice::route('/{record}'),
             'edit' => EditSalesInvoice::route('/{record}/edit'),
+            'edit-sell' => EditSell::route('/{record}/edit-sell'),
+            'sales-return' => SalesReturnEntry::route('/{record}/sales-return'),
         ];
     }
 }

@@ -46,7 +46,7 @@ class SalesInvoiceForm
                     ->preload()
                     ->required(),
                 Toggle::make('is_retail')
-                    ->label('بيع مفرد')
+                    ->label('بيع قطاعي')
                     ->default(true),
                 TextInput::make('extra_cost')
                     ->label('تكاليف إضافية')

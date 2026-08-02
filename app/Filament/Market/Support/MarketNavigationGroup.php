@@ -11,4 +11,6 @@ final class MarketNavigationGroup
     public const CustomersSuppliers = 'زبائن وموردين';
 
     public const WarehousesItems = 'مخازن وأصناف';
+
+    public const ReceiptsAndPayments = 'ايصالات قبض ودفع';
 }

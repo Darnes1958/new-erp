@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseInvoice;
 use App\Models\SalesInvoice;
+use App\Models\SalesOfferInvoice;
 use App\Services\Pdf\InvoicePdfService;
 use Illuminate\Http\Response;
 
@@ -25,5 +26,12 @@ class InvoicePdfController extends Controller
         $invoice = SalesInvoice::query()->findOrFail($salesInvoice);
 
         return $this->pdfService->salesInvoice($invoice)->toResponse(request());
+    }
+
+    public function salesOffer(int $salesOfferInvoice): Response
+    {
+        $invoice = SalesOfferInvoice::query()->findOrFail($salesOfferInvoice);
+
+        return $this->pdfService->salesOfferInvoice($invoice)->toResponse(request());
     }
 }

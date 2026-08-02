@@ -327,16 +327,31 @@ class CompanyDataConverter
 
     protected function convertPurchases(): void
     {
-        $this->insertWithIdentity('purchase_returns', $this->sourceQuery('tar_buys')->map(fn ($row) => [
-            'id' => (int) $row->id,
-            'purchase_invoice_id' => (int) $row->buy_id,
-            'item_id' => (int) $row->item_id,
-            'return_date' => $row->created_at,
-            'notes' => null,
-            'created_by' => $row->user_id ?? null,
-            'created_at' => $row->created_at,
-            'updated_at' => $row->updated_at,
-        ])->all());
+        $buyLinesByReturn = $this->sourceQuery('buy_trans')
+            ->whereNotNull('tar_buy_id')
+            ->where('tar_buy_id', '!=', 0)
+            ->get()
+            ->keyBy('tar_buy_id');
+
+        $this->insertWithIdentity('purchase_returns', $this->sourceQuery('tar_buys')->map(function ($row) use ($buyLinesByReturn) {
+            $line = $buyLinesByReturn->get($row->id);
+
+            return [
+                'id' => (int) $row->id,
+                'purchase_invoice_id' => (int) $row->buy_id,
+                'purchase_invoice_line_id' => $line ? (int) $line->id : null,
+                'item_id' => (int) $row->item_id,
+                'return_date' => $row->tar_date ?? $row->created_at,
+                'qty_primary' => $row->q1 ?? 0,
+                'qty_secondary' => $row->q2 ?? 0,
+                'unit_cost_primary' => $row->p1 ?? 0,
+                'line_total' => $row->sub_tot ?? 0,
+                'notes' => null,
+                'created_by' => $row->user_id ?? null,
+                'created_at' => $row->created_at,
+                'updated_at' => $row->updated_at,
+            ];
+        })->all());
 
         $this->insertWithIdentity('purchase_invoices', $this->sourceQuery('buys')->map(fn ($row) => [
             'id' => (int) $row->id,
@@ -374,16 +389,31 @@ class CompanyDataConverter
 
     protected function convertSales(): void
     {
-        $this->insertWithIdentity('sales_returns', $this->sourceQuery('tar_sells')->map(fn ($row) => [
-            'id' => (int) $row->id,
-            'sales_invoice_id' => (int) $row->sell_id,
-            'item_id' => (int) $row->item_id,
-            'return_date' => $row->created_at,
-            'notes' => null,
-            'created_by' => $row->user_id ?? null,
-            'created_at' => $row->created_at,
-            'updated_at' => $row->updated_at,
-        ])->all());
+        $sellLinesByReturn = $this->sourceQuery('sell_trans')
+            ->whereNotNull('tar_sell_id')
+            ->where('tar_sell_id', '!=', 0)
+            ->get()
+            ->keyBy('tar_sell_id');
+
+        $this->insertWithIdentity('sales_returns', $this->sourceQuery('tar_sells')->map(function ($row) use ($sellLinesByReturn) {
+            $line = $sellLinesByReturn->get($row->id);
+
+            return [
+                'id' => (int) $row->id,
+                'sales_invoice_id' => (int) $row->sell_id,
+                'sales_invoice_line_id' => $line ? (int) $line->id : null,
+                'item_id' => (int) $row->item_id,
+                'return_date' => $row->tar_date ?? $row->created_at,
+                'qty_primary' => $row->q1 ?? 0,
+                'qty_secondary' => $row->q2 ?? 0,
+                'unit_price_primary' => $row->p1 ?? 0,
+                'line_total' => $row->sub_tot ?? 0,
+                'notes' => null,
+                'created_by' => $row->user_id ?? null,
+                'created_at' => $row->created_at,
+                'updated_at' => $row->updated_at,
+            ];
+        })->all());
 
         $this->insertWithIdentity('sales_invoices', $this->sourceQuery('sells')->map(fn ($row) => [
             'id' => (int) $row->id,

@@ -2,9 +2,8 @@
 
 namespace App\Filament\Market\Pages\InpSell\Schemas;
 
-use App\Filament\Market\Tables\ItemPickerTable;
-use App\Models\Item;
-use App\Support\CompanySettings;
+use App\Filament\Market\Tables\SalesItemPickerTable;
+use App\Support\SalesItemAvailability;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
@@ -12,6 +11,7 @@ use Filament\Forms\Components\TableSelect;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
 class SalesLineForm
@@ -27,10 +27,10 @@ class SalesLineForm
                     ->hiddenLabel()
                     ->prefix('الباركود')
                     ->columnSpanFull()
-                    ->live(onBlur: true)
-                    ->afterStateUpdated(fn ($state) => $page->checkBarcode($state))
-                    ->extraAttributes(['wire:keydown.enter.prevent' => 'submitBarcode'])
                     ->autocomplete(false)
+                    ->extraInputAttributes([
+                        'wire:keydown.enter' => 'checkBarcode($event.target.value)',
+                    ])
                     ->id('barcode'),
                 Select::make('item_id')
                     ->hiddenLabel()
@@ -38,7 +38,14 @@ class SalesLineForm
                     ->columnSpanFull()
                     ->searchable()
                     ->preload()
-                    ->relationship('item', 'name')
+                    ->relationship(
+                        'item',
+                        'name',
+                        modifyQueryUsing: fn (Builder $query) => SalesItemAvailability::applyWarehouseStockFilter(
+                            $query,
+                            $page->currentWarehouseId(),
+                        ),
+                    )
                     ->live()
                     ->required()
                     ->afterStateUpdated(fn ($state) => $page->checkItem($state))
@@ -49,8 +56,10 @@ class SalesLineForm
                             ->schema([
                                 TableSelect::make('item_id')
                                     ->hiddenLabel()
-                                    ->relationship('item', 'name')
-                                    ->tableConfiguration(ItemPickerTable::class)
+                                    ->tableConfiguration(SalesItemPickerTable::class)
+                                    ->tableArguments(fn (): array => [
+                                        'warehouse_id' => $page->currentWarehouseId(),
+                                    ])
                                     ->columnSpanFull(),
                             ])
                             ->fillForm(fn (): array => [
