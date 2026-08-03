@@ -23,6 +23,7 @@ class DeductionBatch extends CompanyModel
         'posted_surplus_amount',
         'posted_partial_amount',
         'wrong_amount',
+        'posted_cancelled_amount',
         'created_by',
     ];
 

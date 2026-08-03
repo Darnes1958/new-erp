@@ -4,8 +4,9 @@ namespace App\Filament\Ins\Resources\InstallmentContracts\Tables;
 
 use App\Filament\Ins\Pages\EditInstallmentContract;
 use App\Filament\Ins\Resources\InstallmentContracts\InstallmentContractResource;
+use App\Filament\Ins\Support\InstallmentContractCancelAfterActions;
+use App\Filament\Ins\Support\InstallmentContractDeleteActions;
 use App\Models\InstallmentContract;
-use App\Services\Installments\InstallmentContractService;
 use App\Support\CompanySettings;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -69,15 +70,14 @@ class InstallmentContractsTable
                     ->url(fn (InstallmentContract $record): string => CompanySettings::linkSalesToInstallments()
                         ? EditInstallmentContract::getUrl(['record' => $record->getKey()])
                         : InstallmentContractResource::getUrl('edit', ['record' => $record])),
-                Action::make('cancel')
-                    ->label('الغاء')
-                    ->icon('heroicon-m-trash')
-                    ->iconButton()
-                    ->color('danger')
-                    ->iconSize(IconSize::Small)
-                    ->requiresConfirmation()
-                    ->visible(fn (): bool => Auth::user()?->can('الغاء عقود') || Auth::user()?->is_prog)
-                    ->action(fn (InstallmentContract $record) => app(InstallmentContractService::class)->cancel($record)),
+                ...InstallmentContractCancelAfterActions::make(
+                    iconButton: true,
+                    visible: fn (): bool => InstallmentContractCancelAfterActions::canRun(),
+                ),
+                InstallmentContractDeleteActions::make(
+                    iconButton: true,
+                    visible: fn (): bool => InstallmentContractDeleteActions::canDeleteByPermission(),
+                ),
             ]);
     }
 }

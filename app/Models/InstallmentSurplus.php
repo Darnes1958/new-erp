@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\InstallmentRecordStatus;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class InstallmentSurplus extends CompanyModel
@@ -24,11 +27,28 @@ class InstallmentSurplus extends CompanyModel
     {
         return [
             'surplus_date' => 'date',
+            'status' => InstallmentRecordStatus::class,
         ];
     }
 
     public function contractable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function suspendedEntries(): MorphMany
+    {
+        return $this->morphMany(InstallmentSuspended::class, 'contractable');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(DeductionBatch::class, 'batch_id');
+    }
+
+    public function isEditable(): bool
+    {
+        return $this->batch_id === null
+            && ($this->status === null || $this->status->isOpen());
     }
 }

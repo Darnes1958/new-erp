@@ -9,7 +9,10 @@ use App\Filament\Ins\Resources\DeductionBatches\DeductionBatchResource;
 use App\Models\DeductionBatch;
 use App\Models\DeductionBatchLine;
 use App\Models\InstallmentContract;
+use App\Models\WrongDeductionAccount;
+use App\Services\Installments\BankAccountSearchService;
 use App\Services\Installments\DeductionBatchService;
+use App\Services\Installments\WrongDeductionAccountService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
@@ -26,7 +29,7 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\IconSize;
 use Filament\Support\Enums\TextSize;
-use Filament\Tables\Columns\Summarizers\Sum;
+use App\Support\Filament\TableSummaries;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -56,6 +59,8 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
     public ?int $contractId = null;
 
     public ?DeductionBatchEntryType $entryType = null;
+
+    public bool $isWrongAccount = false;
 
     public ?string $statusMessage = null;
 
@@ -107,21 +112,39 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                             ->inlineLabel()
                             ->columnSpanFull()
                             ->disabled(fn (): bool => ! $this->batch->isOpen()),
-                        TextInput::make('bank_account_number')
+                        Select::make('bank_account_number')
                             ->label('رقم الحساب')
                             ->columnSpan(3)
                             ->autofocus()
                             ->id('batch_bank_account_number')
-                            ->live(onBlur: true)
+                            ->searchable()
+                            ->searchDebounce(400)
+                            ->searchPrompt('اكتب 4 أرقام على الأقل...')
+                            ->noSearchResultsMessage('لا توجد حسابات مطابقة')
+                            ->placeholder('ابحث برقم الحساب أو اسم الزبون')
                             ->disabled(fn (): bool => ! $this->batch->isOpen())
-                            ->afterStateUpdated(function (): void {
+                            ->getSearchResultsUsing(fn (?string $search): array => app(BankAccountSearchService::class)->searchForBatch(
+                                $this->batch,
+                                $search,
+                            ))
+                            ->getOptionLabelUsing(fn ($value): ?string => filled($value)
+                                ? app(BankAccountSearchService::class)->labelForAccount(
+                                    connection: $this->batch->getConnectionName(),
+                                    payrollBankId: $this->batch->payroll_bank_id,
+                                    installmentBankId: $this->batch->installment_bank_id,
+                                    account: (string) $value,
+                                )
+                                : null)
+                            ->live()
+                            ->afterStateUpdated(function (?string $state): void {
                                 $this->contractId = null;
                                 $this->lineData['installment_contract_id'] = null;
                                 $this->statusMessage = null;
-                            })
-                            ->extraInputAttributes([
-                                'wire:keydown.enter.prevent' => 'resolveAccountFromEnter',
-                            ]),
+
+                                if (filled($state)) {
+                                    $this->resolveAccountFromEnter();
+                                }
+                            }),
                         Select::make('installment_contract_id')
                             ->label('رقم العقد')
                             ->columnSpan(3)
@@ -154,7 +177,7 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                                 TextInput::make('balance')->label('المتبقي')->readOnly()->columnSpan(2),
                                 TextInput::make('installments_remaining')->label('أقساط متبقية')->readOnly()->columnSpan(2),
                             ])
-                            ->visible(fn (): bool => filled($this->contractId)),
+                            ->visible(fn (): bool => filled($this->contractId) || $this->isWrongAccount),
                         DatePicker::make('deduction_date')
                             ->label('التاريخ')
                             ->required()
@@ -190,16 +213,45 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                                     Action::make('wrongLine')
                                         ->label('بالخطأ')
                                         ->color('warning')
+                                        ->fillForm(function (): array {
+                                            $account = trim((string) ($this->lineData['bank_account_number'] ?? ''));
+                                            $registry = $account !== ''
+                                                ? app(WrongDeductionAccountService::class)->findForBatch($this->batch, $account)
+                                                : null;
+
+                                            return [
+                                                'account_number' => $account,
+                                                'name' => $registry?->name ?? ($this->lineData['customer_name'] ?? ''),
+                                                'deduction_date' => $this->lineData['deduction_date'] ?? now()->toDateString(),
+                                                'amount' => $this->lineData['deducted_amount'] ?? null,
+                                            ];
+                                        })
                                         ->schema([
-                                            TextInput::make('name')->label('الاسم')->required(),
-                                            DatePicker::make('deduction_date')->label('التاريخ')->required()->default(now()),
-                                            TextInput::make('amount')->label('القسط')->numeric()->required(),
+                                            TextInput::make('account_number')
+                                                ->label('رقم الحساب')
+                                                ->required()
+                                                ->autofocus(),
+                                            TextInput::make('name')
+                                                ->label('الاسم')
+                                                ->required()
+                                                ->extraInputAttributes([
+                                                    'wire:keydown.enter.prevent' => '$dispatch("focus-field", { field: "wrong_line_amount" })',
+                                                ]),
+                                            DatePicker::make('deduction_date')
+                                                ->label('التاريخ')
+                                                ->required()
+                                                ->default(now()),
+                                            TextInput::make('amount')
+                                                ->label('القسط')
+                                                ->numeric()
+                                                ->required()
+                                                ->id('wrong_line_amount'),
                                         ])
                                         ->action(function (array $data, DeductionBatchService $service): void {
-                                            $account = trim((string) ($this->lineData['bank_account_number'] ?? ''));
+                                            $account = trim((string) ($data['account_number'] ?? ''));
 
                                             if ($account === '') {
-                                                Notification::make()->title('يجب إدخال رقم الحساب أولاً')->warning()->send();
+                                                Notification::make()->title('يجب إدخال رقم الحساب')->warning()->send();
 
                                                 return;
                                             }
@@ -241,7 +293,7 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                 TextColumn::make('amount')
                     ->label('القسط')
                     ->numeric(3)
-                    ->summarize(Sum::make()->numeric(3)->label(' ')),
+                    ->summarize(TableSummaries::sum()->numeric(3)),
                 TextColumn::make('deduction_date')
                     ->label('التاريخ')
                     ->date('Y-m-d')
@@ -268,18 +320,34 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
 
     public function resolveAccountFromEnter(): void
     {
+        $account = trim((string) ($this->lineData['bank_account_number'] ?? ''));
+
+        if ($account === '') {
+            return;
+        }
+
         try {
             $resolved = app(DeductionBatchService::class)->resolveContract(
                 $this->batch,
-                (string) ($this->lineData['bank_account_number'] ?? ''),
+                $account,
                 $this->lineData['installment_contract_id'] ?? null,
             );
 
+            $this->isWrongAccount = false;
             $this->applyResolvedContract($resolved['contract'], $resolved['entry_type']);
             $this->focusField('batch_deduction_date');
         } catch (ValidationException $exception) {
-            $this->statusMessage = collect($exception->errors())->flatten()->first();
-            $this->statusColor = 'danger';
+            $wrong = app(WrongDeductionAccountService::class)->findForBatch($this->batch, $account);
+
+            if ($wrong) {
+                $this->applyWrongAccountPreview($wrong);
+                $this->focusField('batch_deduction_date');
+
+                return;
+            }
+
+            $this->applyPendingWrongAccountPreview($account);
+            $this->focusField('batch_deduction_date');
         }
     }
 
@@ -290,6 +358,12 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
             'lineData.deducted_amount' => ['required', 'numeric', 'min:0.001'],
             'lineData.bank_account_number' => ['required', 'string'],
         ]);
+
+        if ($this->isWrongAccount || $this->entryType === DeductionBatchEntryType::Wrong) {
+            $this->storeWrongLine($service);
+
+            return;
+        }
 
         try {
             $resolved = $service->resolveContract(
@@ -309,6 +383,41 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
             );
 
             Notification::make()->title('تمت إضافة القسط للحافظة')->success()->send();
+            $this->resetLineEntry();
+            $this->resetTable();
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title(collect($exception->errors())->flatten()->first() ?? 'خطأ')
+                ->danger()
+                ->send();
+        }
+    }
+
+    protected function storeWrongLine(DeductionBatchService $service): void
+    {
+        $account = trim((string) ($this->lineData['bank_account_number'] ?? ''));
+        $wrong = app(WrongDeductionAccountService::class)->findForBatch($this->batch, $account);
+        $name = trim((string) ($this->lineData['customer_name'] ?? '')) ?: ($wrong?->name ?? '');
+
+        if ($name === '') {
+            Notification::make()
+                ->title('يجب إدخال الاسم — استخدم زر «بالخطأ»')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $service->addWrongLine(
+                $this->batch,
+                $account,
+                $name,
+                (float) $this->lineData['deducted_amount'],
+                $this->lineData['deduction_date'],
+            );
+
+            Notification::make()->title('تمت إضافة القسط بالخطأ')->success()->send();
             $this->resetLineEntry();
             $this->resetTable();
         } catch (ValidationException $exception) {
@@ -357,19 +466,65 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
     {
         $this->contractId = null;
         $this->entryType = null;
+        $this->isWrongAccount = false;
         $this->statusMessage = null;
         $this->lineData = $this->defaultLineData();
         $this->focusField('batch_bank_account_number');
     }
 
+    protected function applyWrongAccountPreview(WrongDeductionAccount $wrong): void
+    {
+        $this->contractId = null;
+        $this->entryType = DeductionBatchEntryType::Wrong;
+        $this->isWrongAccount = true;
+        $this->statusMessage = 'قسط بالخطأ';
+        $this->statusColor = 'warning';
+
+        $this->lineData = array_merge($this->lineData, [
+            'bank_account_number' => $wrong->account_number,
+            'installment_contract_id' => null,
+            'customer_name' => $wrong->name,
+            'contract_total' => null,
+            'balance' => null,
+            'installments_remaining' => null,
+            'deduction_date' => now()->toDateString(),
+        ]);
+    }
+
+    protected function applyPendingWrongAccountPreview(string $account): void
+    {
+        $this->contractId = null;
+        $this->entryType = DeductionBatchEntryType::Wrong;
+        $this->isWrongAccount = true;
+        $this->statusMessage = 'حساب جديد — اضغط «بالخطأ» وأدخل الاسم';
+        $this->statusColor = 'warning';
+
+        $this->lineData = array_merge($this->lineData, [
+            'bank_account_number' => $account,
+            'installment_contract_id' => null,
+            'customer_name' => null,
+            'contract_total' => null,
+            'balance' => null,
+            'installments_remaining' => null,
+            'deduction_date' => now()->toDateString(),
+        ]);
+    }
+
     protected function applyResolvedContract($contract, DeductionBatchEntryType $entryType): void
     {
+        $this->isWrongAccount = false;
         $this->contractId = (int) $contract->id;
         $this->entryType = $entryType;
         $this->statusMessage = $entryType === DeductionBatchEntryType::Archive
             ? 'قسط من الأرشيف'
-            : null;
-        $this->statusColor = $entryType === DeductionBatchEntryType::Archive ? 'success' : 'info';
+            : ($entryType === DeductionBatchEntryType::Cancelled
+                ? 'عقد ملغي بعد التعاقد'
+                : null);
+        $this->statusColor = match ($entryType) {
+            DeductionBatchEntryType::Archive => 'success',
+            DeductionBatchEntryType::Cancelled => 'warning',
+            default => 'info',
+        };
 
         $this->lineData = array_merge($this->lineData, [
             'installment_contract_id' => $contract->id,
@@ -377,7 +532,7 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
             'customer_name' => $contract->customer?->name,
             'contract_total' => number_format((float) $contract->contract_total, 3, '.', ','),
             'balance' => number_format((float) $contract->balance, 3, '.', ','),
-            'installments_remaining' => $contract instanceof InstallmentContract
+            'installments_remaining' => $contract instanceof InstallmentContract || $contract instanceof \App\Models\InstallmentCancelledContract
                 ? (string) $contract->installments_remaining
                 : '0',
             'deducted_amount' => (string) $contract->installment_amount,
@@ -434,6 +589,21 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
 
             $options[$id] = sprintf(
                 '[أرشيف] %s %s %s',
+                (string) $contract->id,
+                (string) ($contract->customer?->name ?? ''),
+                number_format((float) $contract->contract_total, 3, '.', ','),
+            );
+        }
+
+        foreach ($service->cancelledContractsForAccount($this->batch, $account) as $contract) {
+            $id = (int) $contract->getKey();
+
+            if (isset($options[$id])) {
+                continue;
+            }
+
+            $options[$id] = sprintf(
+                '[ملغي] %s %s %s',
                 (string) $contract->id,
                 (string) ($contract->customer?->name ?? ''),
                 number_format((float) $contract->contract_total, 3, '.', ','),

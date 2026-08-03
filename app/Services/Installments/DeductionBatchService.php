@@ -6,8 +6,10 @@ use App\Enums\DeductionBatchEntryType;
 use App\Enums\DeductionBatchPostedType;
 use App\Enums\DeductionBatchStatus;
 use App\Enums\InstallmentDeductionType;
+use App\Enums\InstallmentRecordStatus;
 use App\Models\DeductionBatch;
 use App\Models\DeductionBatchLine;
+use App\Models\InstallmentCancelledContract;
 use App\Models\InstallmentContract;
 use App\Models\InstallmentContractArchive;
 use App\Models\WrongDeduction;
@@ -22,6 +24,7 @@ class DeductionBatchService
 {
     public function __construct(
         protected InstallmentDeductionService $deductionService,
+        protected InstallmentCancelledContractService $cancelledContractService,
     ) {}
 
     public function create(array $data): DeductionBatch
@@ -73,6 +76,22 @@ class DeductionBatchService
         return $query->orderBy('id')->get();
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, InstallmentCancelledContract>
+     */
+    public function cancelledContractsForAccount(DeductionBatch $batch, string $accountNumber): \Illuminate\Database\Eloquent\Collection
+    {
+        $connection = $batch->getConnectionName();
+
+        $query = InstallmentCancelledContract::on($connection)
+            ->with('customer')
+            ->where('bank_account_number', $accountNumber);
+
+        $this->applyBatchBankScope($query, $batch);
+
+        return $query->orderBy('id')->get();
+    }
+
     public function resolveContract(
         DeductionBatch $batch,
         string $accountNumber,
@@ -113,6 +132,21 @@ class DeductionBatchService
                 ];
             }
 
+            $cancelledQuery = InstallmentCancelledContract::on($batch->getConnectionName())
+                ->whereKey($contractId)
+                ->where('bank_account_number', $accountNumber);
+
+            InstallmentBankScope::applyContractScope($cancelledQuery, $batch);
+
+            $cancelled = $cancelledQuery->first();
+
+            if ($cancelled) {
+                return [
+                    'contract' => $cancelled,
+                    'entry_type' => DeductionBatchEntryType::Cancelled,
+                ];
+            }
+
             throw ValidationException::withMessages([
                 'installment_contract_id' => 'العقد غير موجود أو لا يتبع هذا الحساب.',
             ]);
@@ -143,6 +177,21 @@ class DeductionBatchService
         if ($archives->count() > 1) {
             throw ValidationException::withMessages([
                 'installment_contract_id' => 'يوجد أكثر من عقد أرشيف لهذا الحساب .. يجب اختيار رقم العقد.',
+            ]);
+        }
+
+        $cancelled = $this->cancelledContractsForAccount($batch, $accountNumber);
+
+        if ($cancelled->count() === 1) {
+            return [
+                'contract' => $cancelled->first(),
+                'entry_type' => DeductionBatchEntryType::Cancelled,
+            ];
+        }
+
+        if ($cancelled->count() > 1) {
+            throw ValidationException::withMessages([
+                'installment_contract_id' => 'يوجد أكثر من عقد ملغي لهذا الحساب .. يجب اختيار رقم العقد.',
             ]);
         }
 
@@ -197,6 +246,8 @@ class DeductionBatchService
             ]);
         }
 
+        app(WrongDeductionAccountService::class)->remember($batch, $accountNumber, $name);
+
         return $batch->lines()->create([
             'contractable_type' => 'wrong_deduction',
             'contractable_id' => 0,
@@ -232,17 +283,25 @@ class DeductionBatchService
                 'posted_surplus_amount' => 0.0,
                 'posted_partial_amount' => 0.0,
                 'wrong_amount' => 0.0,
+                'posted_cancelled_amount' => 0.0,
             ];
 
             foreach ($lines as $line) {
                 if ($line->entry_type === DeductionBatchEntryType::Wrong) {
-                    WrongDeduction::query()->create([
+                    app(WrongDeductionAccountService::class)->remember(
+                        $batch,
+                        (string) $line->account_number,
+                        (string) $line->notes,
+                    );
+
+                    WrongDeduction::on($batch->getConnectionName())->create([
                         'payroll_bank_id' => $batch->payroll_bank_id,
                         'account_number' => $line->account_number,
                         'name' => $line->notes,
                         'amount' => $line->amount,
-                        'status' => 0,
+                        'status' => InstallmentRecordStatus::Open->value,
                         'batch_id' => $batch->id,
+                        'deduction_date' => $line->deduction_date ?? $batch->batch_date,
                         'created_by' => Auth::id(),
                     ]);
 
@@ -260,6 +319,26 @@ class DeductionBatchService
                             'batch' => 'العقد رقم '.$line->contractable_id.' غير موجود في العقود القائمة.',
                         ]);
                     }
+                } elseif ($line->entry_type === DeductionBatchEntryType::Cancelled) {
+                    if (! $contract instanceof InstallmentCancelledContract) {
+                        throw ValidationException::withMessages([
+                            'batch' => 'العقد رقم '.$line->contractable_id.' غير موجود في العقود الملغية.',
+                        ]);
+                    }
+
+                    $result = $this->cancelledContractService->recordDeduction(
+                        $contract,
+                        $line->deduction_date,
+                        (float) $line->amount,
+                        InstallmentDeductionType::Bank->value,
+                        $line->notes,
+                        $batch->id,
+                    );
+
+                    $line->forceFill(['posted_type' => $result['posted_type']])->saveQuietly();
+                    $stats['posted_cancelled_amount'] += (float) $line->amount;
+
+                    continue;
                 } elseif (! $contract instanceof InstallmentContractArchive) {
                     throw ValidationException::withMessages([
                         'batch' => 'العقد رقم '.$line->contractable_id.' غير موجود في الأرشيف.',
@@ -283,6 +362,7 @@ class DeductionBatchService
                     DeductionBatchPostedType::Archive => $stats['posted_archive_amount'] += $amount,
                     DeductionBatchPostedType::Surplus => $stats['posted_surplus_amount'] += $amount,
                     DeductionBatchPostedType::Partial => $stats['posted_partial_amount'] += $amount,
+                    DeductionBatchPostedType::Cancelled => $stats['posted_cancelled_amount'] += $amount,
                     default => null,
                 };
             }

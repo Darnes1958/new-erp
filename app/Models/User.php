@@ -19,6 +19,14 @@ class User extends Authenticatable implements FilamentUser
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, Notifiable;
 
+    /**
+     * Users live on the central auth database, not the active company connection.
+     */
+    public function getConnectionName(): ?string
+    {
+        return config('database.default');
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
         if ((int) $this->status === 0) {

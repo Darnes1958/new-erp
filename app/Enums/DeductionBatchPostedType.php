@@ -12,6 +12,7 @@ enum DeductionBatchPostedType: int implements HasColor, HasLabel
     case Surplus = 3;
     case Partial = 4;
     case Wrong = 5;
+    case Cancelled = 6;
 
     public function getLabel(): ?string
     {
@@ -21,6 +22,7 @@ enum DeductionBatchPostedType: int implements HasColor, HasLabel
             self::Surplus => 'فائض',
             self::Partial => 'جزئي',
             self::Wrong => 'بالخطأ',
+            self::Cancelled => 'ملغي',
         };
     }
 
@@ -32,6 +34,7 @@ enum DeductionBatchPostedType: int implements HasColor, HasLabel
             self::Partial => 'warning',
             self::Surplus => 'primary',
             self::Wrong => 'gray',
+            self::Cancelled => 'warning',
         };
     }
 }

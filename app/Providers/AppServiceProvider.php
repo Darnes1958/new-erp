@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Http\Responses\MarketPanelLoginResponse;
+use App\Models\InstallmentCancelledContract;
+use App\Models\InstallmentCancelledDeduction;
 use App\Models\InstallmentContract;
 use App\Models\InstallmentContractArchive;
 use App\Models\InstallmentDeduction;
@@ -11,6 +13,7 @@ use App\Models\InstallmentSurplus;
 use App\Models\InstallmentSuspended;
 use App\Observers\InstallmentContractableMetricsObserver;
 use App\Observers\InstallmentDeductionObserver;
+use App\Support\Filament\TableSummaries;
 use App\Support\PdfChrome;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Filament\Schemas\Schema;
@@ -18,6 +21,7 @@ use Filament\Support\Facades\FilamentView;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Number;
 use Illuminate\Support\ServiceProvider;
@@ -43,7 +47,15 @@ class AppServiceProvider extends ServiceProvider
         Relation::morphMap([
             'installment_contract' => InstallmentContract::class,
             'installment_contract_archive' => InstallmentContractArchive::class,
+            'installment_contract_cancelled' => InstallmentCancelledContract::class,
+            'installment_cancelled_deduction' => InstallmentCancelledDeduction::class,
+            'installment_surplus' => InstallmentSurplus::class,
             'wrong_deduction' => WrongDeduction::class,
+            // Legacy ERP morph types stored during data conversion.
+            'App\Models\Main' => InstallmentContract::class,
+            'App\Models\Main_arc' => InstallmentContractArchive::class,
+            'App\Models\Overkst' => InstallmentSurplus::class,
+            'App\Models\Wrongkst' => WrongDeduction::class,
         ]);
 
         Pdf::default()
@@ -83,7 +95,17 @@ class AppServiceProvider extends ServiceProvider
 
         Number::useLocale($numberLocale);
 
-        Table::configureUsing(fn (Table $table) => $table
+        Lang::addLines([
+            'table.summary.heading' => '',
+            'table.summary.subheadings.all' => '',
+            'table.summary.subheadings.page' => '',
+            'table.summary.subheadings.group' => '',
+            'table.summary.summarizers.sum.label' => '',
+            'table.summary.summarizers.average.label' => '',
+            'table.summary.summarizers.count.label' => '',
+        ], 'ar', 'filament-tables');
+
+        Table::configureUsing(fn (Table $table) => TableSummaries::applyDefaults($table)
             ->defaultNumberLocale($numberLocale)
             ->pluralModelLabel('الصفحات')
             ->emptyStateHeading('لا توجد بيانات')

@@ -10,6 +10,7 @@ enum DeductionBatchEntryType: int implements HasColor, HasLabel
     case Active = 1;
     case Archive = 2;
     case Wrong = 5;
+    case Cancelled = 6;
 
     public function getLabel(): ?string
     {
@@ -17,6 +18,7 @@ enum DeductionBatchEntryType: int implements HasColor, HasLabel
             self::Active => 'قائم',
             self::Archive => 'أرشيف',
             self::Wrong => 'بالخطأ',
+            self::Cancelled => 'ملغي',
         };
     }
 
@@ -26,6 +28,7 @@ enum DeductionBatchEntryType: int implements HasColor, HasLabel
             self::Active => 'info',
             self::Archive => 'danger',
             self::Wrong => 'warning',
+            self::Cancelled => 'warning',
         };
     }
 }

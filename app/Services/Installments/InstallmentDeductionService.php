@@ -3,6 +3,7 @@
 namespace App\Services\Installments;
 
 use App\Enums\DeductionBatchPostedType;
+use App\Enums\InstallmentRecordStatus;
 use App\Models\InstallmentContract;
 use App\Models\InstallmentContractArchive;
 use App\Models\InstallmentDeduction;
@@ -236,7 +237,7 @@ class InstallmentDeductionService
         return $contract->surpluses()->create([
             'surplus_date' => $surplusDate,
             'amount' => $amount,
-            'status' => 0,
+            'status' => InstallmentRecordStatus::Open->value,
             'batch_id' => $batchId,
             'deduction_id' => $deductionId,
             'created_by' => Auth::id(),

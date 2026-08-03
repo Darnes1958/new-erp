@@ -3,9 +3,10 @@
 namespace App\Filament\Ins\Resources\InstallmentContracts\Pages;
 
 use App\Filament\Ins\Resources\InstallmentContracts\InstallmentContractResource;
+use App\Filament\Ins\Support\InstallmentContractCancelAfterActions;
+use App\Filament\Ins\Support\InstallmentContractDeleteActions;
 use App\Services\Installments\InstallmentContractService;
 use App\Support\CompanySettings;
-use Filament\Actions\Action;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
@@ -46,17 +47,18 @@ class EditInstallmentContractRecord extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('cancel')
-                ->label('الغاء')
-                ->icon('heroicon-m-trash')
-                ->color('danger')
-                ->requiresConfirmation()
-                ->visible(fn (): bool => static::getResource()::canDelete($this->record))
-                ->action(function (): void {
-                    app(InstallmentContractService::class)->cancel($this->record);
-
-                    $this->redirect(static::getResource()::getUrl('index'));
-                }),
+            ...InstallmentContractCancelAfterActions::make(
+                visible: fn (): bool => static::getResource()::canDelete($this->record),
+                after: fn ($record, mixed $livewire) => $livewire->redirect(
+                    static::getResource()::getUrl('index')
+                ),
+            ),
+            InstallmentContractDeleteActions::make(
+                visible: fn (): bool => static::getResource()::canDelete($this->record),
+                afterDelete: fn ($record, mixed $livewire) => $livewire->redirect(
+                    static::getResource()::getUrl('index')
+                ),
+            ),
         ];
     }
 

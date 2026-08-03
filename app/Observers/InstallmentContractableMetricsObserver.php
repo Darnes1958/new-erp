@@ -6,6 +6,7 @@ use App\Models\InstallmentContract;
 use App\Models\InstallmentSurplus;
 use App\Models\InstallmentSuspended;
 use App\Services\Installments\InstallmentContractMetricsService;
+use App\Services\Installments\InstallmentReturnService;
 
 class InstallmentContractableMetricsObserver
 {
@@ -25,10 +26,12 @@ class InstallmentContractableMetricsObserver
 
     protected function recalculate(InstallmentSurplus|InstallmentSuspended $entry): void
     {
-        $contractable = $entry->contractable;
+        $contract = $entry instanceof InstallmentSurplus
+            ? $entry->contractable
+            : app(InstallmentReturnService::class)->resolveContract($entry);
 
-        if ($contractable instanceof InstallmentContract) {
-            $this->metrics->recalculate($contractable);
+        if ($contract instanceof InstallmentContract) {
+            $this->metrics->recalculate($contract);
         }
     }
 }

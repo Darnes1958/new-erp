@@ -88,4 +88,9 @@ class InstallmentContract extends CompanyModel
     {
         return $this->morphMany(InstallmentSuspended::class, 'contractable');
     }
+
+    public function stops(): HasMany
+    {
+        return $this->hasMany(InstallmentStop::class);
+    }
 }

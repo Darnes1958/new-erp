@@ -3,6 +3,7 @@
 namespace App\Services\Installments;
 
 use App\Models\InstallmentBank;
+use App\Models\InstallmentCancelledContract;
 use App\Models\InstallmentContract;
 use App\Models\InstallmentContractArchive;
 use App\Models\InstallmentDeduction;
@@ -24,8 +25,9 @@ class InstallmentContractService
     {
         $activeMax = (int) (InstallmentContract::query()->max('id') ?? 0);
         $archiveMax = (int) (InstallmentContractArchive::query()->max('id') ?? 0);
+        $cancelledMax = (int) (InstallmentCancelledContract::query()->max('id') ?? 0);
 
-        return max($activeMax, $archiveMax) + 1;
+        return max($activeMax, $archiveMax, $cancelledMax) + 1;
     }
 
     public static function eligibleSalesInvoicesQuery()
@@ -87,6 +89,7 @@ class InstallmentContractService
         if (
             InstallmentContract::query()->whereKey($contractId)->exists()
             || InstallmentContractArchive::query()->whereKey($contractId)->exists()
+            || InstallmentCancelledContract::query()->whereKey($contractId)->exists()
         ) {
             throw ValidationException::withMessages([
                 'id' => 'رقم العقد مستخدم مسبقاً.',
@@ -294,6 +297,11 @@ class InstallmentContractService
         return $contract->refresh();
     }
 
+    public function cancelAfterContract(InstallmentContract $contract): InstallmentCancelledContract
+    {
+        return app(InstallmentCancelledContractService::class)->moveFromActive($contract);
+    }
+
     public function cancel(InstallmentContract $contract): void
     {
         DB::connection($contract->getConnectionName())->transaction(function () use ($contract): void {
@@ -333,6 +341,7 @@ class InstallmentContractService
         if (
             InstallmentContract::query()->whereKey($contractId)->exists()
             || InstallmentContractArchive::query()->whereKey($contractId)->exists()
+            || InstallmentCancelledContract::query()->whereKey($contractId)->exists()
         ) {
             throw ValidationException::withMessages([
                 'id' => 'رقم العقد مستخدم مسبقاً.',

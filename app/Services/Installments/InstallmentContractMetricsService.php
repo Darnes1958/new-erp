@@ -2,7 +2,9 @@
 
 namespace App\Services\Installments;
 
+use App\Models\InstallmentCancelledContract;
 use App\Models\InstallmentContract;
+use App\Models\InstallmentSuspended;
 use App\Support\CompanyConnections;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -64,8 +66,12 @@ class InstallmentContractMetricsService
 
         $surplusCount = (int) $contract->surpluses()->count();
         $surplusAmount = (float) $contract->surpluses()->sum('amount');
-        $suspendedCount = (int) $contract->suspendedEntries()->count();
-        $suspendedAmount = (float) $contract->suspendedEntries()->sum('amount');
+        $suspendedCount = (int) InstallmentSuspended::on($contract->getConnectionName())
+            ->where('installment_contract_id', $contract->id)
+            ->count();
+        $suspendedAmount = (float) InstallmentSuspended::on($contract->getConnectionName())
+            ->where('installment_contract_id', $contract->id)
+            ->sum('amount');
 
         $installmentsRemaining = self::remainingInstallmentCount($contract, $deductionCount);
         $lateAmount = min(
@@ -174,6 +180,48 @@ class InstallmentContractMetricsService
         }
 
         return $count;
+    }
+
+    public static function remainingCancelledInstallmentCount(InstallmentCancelledContract $contract, ?int $deductionCount = null): int
+    {
+        $deductionCount ??= (int) $contract->deductions()->count();
+
+        return max(0, (int) $contract->installment_count - $deductionCount);
+    }
+
+    public function recalculateCancelled(InstallmentCancelledContract $contract, ?Carbon $asOf = null): InstallmentCancelledContract
+    {
+        $asOf ??= now();
+
+        $deductionCount = (int) $contract->deductions()->count();
+        $totalPaid = (float) $contract->deductions()->sum('deducted_amount');
+        $lastDeductionDate = $contract->deductions()->max('deduction_date');
+        $lastDueDate = $contract->deductions()->max('installment_due_date');
+
+        $nextInstallmentDate = $lastDueDate
+            ? self::nextInstallmentDateAfter($lastDueDate)
+            : self::initialNextInstallmentDate($contract->contract_start ?? $asOf);
+
+        $surplusCount = (int) $contract->surpluses()->count();
+        $surplusAmount = (float) $contract->surpluses()->sum('amount');
+        $suspendedCount = (int) $contract->suspendedEntries()->count();
+        $suspendedAmount = (float) $contract->suspendedEntries()->sum('amount');
+        $installmentsRemaining = self::remainingCancelledInstallmentCount($contract, $deductionCount);
+
+        $contract->forceFill([
+            'total_paid' => $totalPaid,
+            'balance' => (float) $contract->contract_total - $totalPaid,
+            'last_deduction_month' => $lastDeductionDate,
+            'next_installment_date' => $nextInstallmentDate,
+            'installments_remaining' => $installmentsRemaining,
+            'surplus_count' => $surplusCount,
+            'surplus_amount' => $surplusAmount,
+            'suspended_count' => $suspendedCount,
+            'suspended_amount' => $suspendedAmount,
+            'late_amount' => 0,
+        ])->saveQuietly();
+
+        return $contract->refresh();
     }
 
     protected function connectionHasContractsTable(string $connection): bool

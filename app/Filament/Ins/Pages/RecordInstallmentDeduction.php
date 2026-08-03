@@ -4,11 +4,15 @@ namespace App\Filament\Ins\Pages;
 
 use App\Enums\InstallmentDeductionType;
 use App\Models\InstallmentBank;
+use App\Models\InstallmentCancelledContract;
 use App\Models\InstallmentContract;
 use App\Models\InstallmentContractArchive;
 use App\Models\InstallmentDeduction;
 use App\Models\PayrollBank;
+use App\Services\Installments\BankAccountSearchService;
+use App\Services\Installments\InstallmentCancelledContractService;
 use App\Services\Installments\InstallmentDeductionService;
+use App\Services\Installments\InstallmentReturnService;
 use App\Support\CompanySettings;
 use App\Support\InstallmentBankScope;
 use Filament\Actions\Action;
@@ -24,6 +28,7 @@ use Filament\Schemas\Components\Text;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\IconSize;
 use Filament\Support\Enums\TextSize;
 use Filament\Tables\Columns\TextColumn;
@@ -58,6 +63,8 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
     public ?int $contractId = null;
 
     public bool $isArchive = false;
+
+    public bool $isCancelled = false;
 
     public bool $accountResolved = false;
 
@@ -130,6 +137,9 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
                             ->afterStateUpdated(function (?int $state, Set $set): void {
                                 $branch = $state ? InstallmentBankScope::branchForPayroll($state) : null;
                                 $set('installment_bank_id', $branch?->id);
+                                $set('bank_account_number', null);
+                                $set('installment_contract_id', null);
+                                $this->resetAccountResolution();
                             }),
                         Select::make('installment_bank_id')
                             ->label('المصرف')
@@ -139,7 +149,12 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
                             ->live()
                             ->required()
                             ->columnSpanFull()
-                            ->visible(fn (): bool => ! CompanySettings::installmentByPayrollBank()),
+                            ->visible(fn (): bool => ! CompanySettings::installmentByPayrollBank())
+                            ->afterStateUpdated(function (?int $state, Set $set): void {
+                                $set('bank_account_number', null);
+                                $set('installment_contract_id', null);
+                                $this->resetAccountResolution();
+                            }),
                         Radio::make('deduction_type_id')
                             ->hiddenLabel()
                             ->options(InstallmentDeductionType::class)
@@ -148,20 +163,40 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
                             ->inlineLabel()
                             ->columnSpanFull()
                             ->required(),
-                        TextInput::make('bank_account_number')
+                        Select::make('bank_account_number')
                             ->label('رقم الحساب')
                             ->columnSpan(3)
                             ->autofocus()
                             ->id('bank_account_number')
-                            ->live(onBlur: true)
-                            ->extraInputAttributes([
-                                'wire:keydown.enter.prevent' => 'resolveAccountFromEnter',
-                            ])
-                            ->afterStateUpdated(function (): void {
-                                $this->accountResolved = false;
-                                $this->contractId = null;
-                                $this->isArchive = false;
-                                $this->statusMessage = null;
+                            ->searchable()
+                            ->searchDebounce(400)
+                            ->searchPrompt('اكتب 4 أرقام على الأقل...')
+                            ->noSearchResultsMessage('لا توجد حسابات مطابقة')
+                            ->placeholder(fn (): string => $this->isBankSelected()
+                                ? 'ابحث برقم الحساب أو اسم الزبون'
+                                : 'اختر المصرف أولاً')
+                            ->disabled(fn (): bool => ! $this->isBankSelected())
+                            ->getSearchResultsUsing(fn (?string $search): array => app(BankAccountSearchService::class)->search(
+                                connection: null,
+                                payrollBankId: isset($this->deductionData['payroll_bank_id']) ? (int) $this->deductionData['payroll_bank_id'] : null,
+                                installmentBankId: isset($this->deductionData['installment_bank_id']) ? (int) $this->deductionData['installment_bank_id'] : null,
+                                search: $search,
+                            ))
+                            ->getOptionLabelUsing(fn ($value): ?string => filled($value)
+                                ? app(BankAccountSearchService::class)->labelForAccount(
+                                    connection: null,
+                                    payrollBankId: isset($this->deductionData['payroll_bank_id']) ? (int) $this->deductionData['payroll_bank_id'] : null,
+                                    installmentBankId: isset($this->deductionData['installment_bank_id']) ? (int) $this->deductionData['installment_bank_id'] : null,
+                                    account: (string) $value,
+                                )
+                                : null)
+                            ->live()
+                            ->afterStateUpdated(function (?string $state): void {
+                                $this->resetAccountResolution();
+
+                                if (filled($state)) {
+                                    $this->resolveAccountFromEnter();
+                                }
                             }),
                         Select::make('installment_contract_id')
                             ->label('رقم العقد')
@@ -376,6 +411,22 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
 
                         Notification::make()->title('تم حذف القسط')->success()->send();
                     }),
+                Action::make('returnDeduction')
+                    ->label('ترجيع')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->iconButton()
+                    ->iconSize(IconSize::Small)
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->visible(fn (InstallmentDeduction $record): bool => ! $this->isArchive && (float) $record->remaining_balance <= 0)
+                    ->action(function (InstallmentDeduction $record): void {
+                        app(InstallmentReturnService::class)->returnFromDeduction($record);
+
+                        $this->loadContractIntoForm();
+                        $this->resetTable();
+
+                        Notification::make()->title('تم ترجيع القسط')->success()->send();
+                    }),
             ]);
     }
 
@@ -399,6 +450,7 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
 
         $this->statusMessage = null;
         $this->isArchive = false;
+        $this->isCancelled = false;
         $this->contractId = null;
         $this->accountResolved = false;
 
@@ -442,13 +494,29 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
             return;
         }
 
+        $cancelled = InstallmentCancelledContract::query()
+            ->where('bank_account_number', $account)
+            ->tap(fn (Builder $query) => $this->applyBankScope($query))
+            ->first();
+
+        if ($cancelled) {
+            $this->contractId = (int) $cancelled->id;
+            $this->isCancelled = true;
+            $this->accountResolved = true;
+            $this->statusMessage = 'عقد ملغي بعد التعاقد';
+            $this->statusColor = 'warning';
+            $this->loadContractIntoForm();
+
+            return;
+        }
+
         $this->statusMessage = 'لم يتم العثور على عقد لهذا الحساب';
         $this->statusColor = 'danger';
     }
 
     public function storeDeduction(InstallmentDeductionService $service): void
     {
-        $this->deductionForm->validate();
+        $this->getSchema('deductionForm')?->validate();
 
         if (! $this->contractId) {
             Notification::make()->title('يجب اختيار العقد أولاً')->warning()->send();
@@ -466,13 +534,23 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
 
         $data = $this->deductionData;
 
-        $result = $service->record(
-            $contract,
-            $data['deduction_date'],
-            (float) $data['deducted_amount'],
-            (int) $data['deduction_type_id'],
-            $data['notes'] ?? null,
-        );
+        if ($contract instanceof InstallmentCancelledContract) {
+            $result = app(InstallmentCancelledContractService::class)->recordDeduction(
+                $contract,
+                $data['deduction_date'],
+                (float) $data['deducted_amount'],
+                (int) $data['deduction_type_id'],
+                $data['notes'] ?? null,
+            );
+        } else {
+            $result = $service->record(
+                $contract,
+                $data['deduction_date'],
+                (float) $data['deducted_amount'],
+                (int) $data['deduction_type_id'],
+                $data['notes'] ?? null,
+            );
+        }
 
         Notification::make()
             ->title($result['message'])
@@ -486,6 +564,8 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
 
         if ($contract instanceof InstallmentContract) {
             $this->deductionData['deducted_amount'] = (string) $contract->fresh()->installment_amount;
+        } elseif ($contract instanceof InstallmentCancelledContract) {
+            $this->deductionData['deducted_amount'] = (string) $contract->fresh()->installment_amount;
         }
 
         $this->deductionData['notes'] = null;
@@ -497,6 +577,7 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
     {
         $this->contractId = null;
         $this->isArchive = false;
+        $this->isCancelled = false;
         $this->accountResolved = false;
         $this->statusMessage = null;
         $this->statusColor = 'danger';
@@ -535,6 +616,29 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
                 'balance' => number_format((float) $contract->balance, 3, '.', ','),
                 'installments_remaining' => (string) $contract->installments_remaining,
                 'late_amount' => (string) (int) $contract->late_amount,
+                'next_installment_date' => $contract->next_installment_date?->toDateString(),
+                'deducted_amount' => (string) $contract->installment_amount,
+            ]);
+
+            $this->applyDeductionDefaults();
+
+            return;
+        }
+
+        if ($contract instanceof InstallmentCancelledContract) {
+            $contract->refresh();
+            $this->hasPartialDeduction = false;
+
+            $this->deductionData = array_merge($this->deductionData, [
+                'installment_contract_id' => $contract->id,
+                'bank_account_number' => $contract->bank_account_number,
+                'customer_name' => $contract->customer?->name,
+                'bank_name' => $contract->installmentBank?->name ?? '',
+                'contract_total' => number_format((float) $contract->contract_total, 3, '.', ','),
+                'total_paid' => number_format((float) $contract->total_paid, 3, '.', ','),
+                'balance' => number_format((float) $contract->balance, 3, '.', ','),
+                'installments_remaining' => (string) $contract->installments_remaining,
+                'late_amount' => '0',
                 'next_installment_date' => $contract->next_installment_date?->toDateString(),
                 'deducted_amount' => (string) $contract->installment_amount,
             ]);
@@ -589,10 +693,16 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
             ->all();
     }
 
-    protected function resolveContract(): InstallmentContract|InstallmentContractArchive|null
+    protected function resolveContract(): InstallmentContract|InstallmentContractArchive|InstallmentCancelledContract|null
     {
         if (! $this->contractId) {
             return null;
+        }
+
+        if ($this->isCancelled) {
+            return InstallmentCancelledContract::query()
+                ->with(['customer', 'installmentBank'])
+                ->find($this->contractId);
         }
 
         if ($this->isArchive) {
@@ -613,5 +723,24 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
             isset($this->deductionData['payroll_bank_id']) ? (int) $this->deductionData['payroll_bank_id'] : null,
             isset($this->deductionData['installment_bank_id']) ? (int) $this->deductionData['installment_bank_id'] : null,
         );
+    }
+
+    protected function isBankSelected(): bool
+    {
+        if (CompanySettings::installmentByPayrollBank()) {
+            return filled($this->deductionData['payroll_bank_id'] ?? null);
+        }
+
+        return filled($this->deductionData['installment_bank_id'] ?? null);
+    }
+
+    protected function resetAccountResolution(): void
+    {
+        $this->accountResolved = false;
+        $this->contractId = null;
+        $this->isArchive = false;
+        $this->isCancelled = false;
+        $this->statusMessage = null;
+        $this->deductionData['installment_contract_id'] = null;
     }
 }

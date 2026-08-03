@@ -75,7 +75,7 @@ class CompanyDataConverter
         $this->log('Clearing target database...');
 
         $tables = [
-            'wrong_deductions', 'deduction_batch_lines', 'deduction_batches',
+            'wrong_deduction_accounts', 'wrong_deductions', 'deduction_batch_lines', 'deduction_batches',
             'installment_suspended', 'installment_cheques', 'installment_stops_without_contract',
             'installment_stops', 'installment_surplus_archives', 'installment_surplus',
             'installment_deduction_archives', 'installment_deductions',
@@ -681,6 +681,7 @@ class CompanyDataConverter
         $this->insertWithIdentity('installment_stops_without_contract', $this->sourceQuery('StopsWithoutMains')->map(fn ($row) => [
             'id' => (int) $row->id,
             'name' => $row->name,
+            'payroll_bank_id' => $row->taj_id ?? null,
             'account_number' => $row->acc,
             'stop_date' => $row->stop_date,
             'created_by' => $row->user_id,
@@ -698,18 +699,30 @@ class CompanyDataConverter
             'updated_at' => $row->updated_at,
         ])->all());
 
-        $this->insertWithIdentity('installment_suspended', $this->sourceQuery('tarksts')->map(fn ($row) => [
-            'id' => (int) $row->id,
-            'contractable_type' => $this->mapMorphType($row->tarkstable_type),
-            'contractable_id' => (int) $row->tarkstable_id,
-            'suspended_date' => $row->tar_date ?? null,
-            'amount' => $row->kst ?? 0,
-            'status' => (int) ($row->tar_type ?? 0),
-            'batch_id' => $row->haf_id,
-            'created_by' => $row->user_id,
-            'created_at' => $row->created_at,
-            'updated_at' => $row->updated_at,
-        ])->all());
+        $this->insertWithIdentity('installment_suspended', $this->sourceQuery('tarksts')->map(function ($row) {
+            $contractableType = $this->mapMorphType($row->tarkstable_type);
+            $contractableId = (int) $row->tarkstable_id;
+            $contractId = filled($row->main_id ?? null)
+                ? (int) $row->main_id
+                : match ($contractableType) {
+                    'installment_contract' => $contractableId,
+                    default => null,
+                };
+
+            return [
+                'id' => (int) $row->id,
+                'contractable_type' => $contractableType,
+                'contractable_id' => $contractableId,
+                'installment_contract_id' => $contractId,
+                'suspended_date' => $row->tar_date ?? null,
+                'amount' => $row->kst ?? 0,
+                'status' => (int) ($row->tar_type ?? 0),
+                'batch_id' => $row->haf_id,
+                'created_by' => $row->user_id,
+                'created_at' => $row->created_at,
+                'updated_at' => $row->updated_at,
+            ];
+        })->all());
 
         $this->insertWithIdentity('deduction_batches', $this->sourceQuery('hafithas')->map(fn ($row) => [
             'id' => (int) $row->id,
@@ -753,11 +766,78 @@ class CompanyDataConverter
             'account_number' => $row->acc,
             'name' => $row->name,
             'amount' => $row->kst ?? 0,
+            'deduction_date' => $row->wrong_date ?? null,
+            'batch_id' => filled($row->haf_id ?? null) ? (int) $row->haf_id : null,
             'status' => (int) ($row->status ?? 0),
             'created_by' => $row->user_id,
             'created_at' => $row->created_at,
             'updated_at' => $row->updated_at,
         ])->all());
+
+        $this->convertWrongDeductionAccounts();
+    }
+
+    protected function convertWrongDeductionAccounts(): void
+    {
+        if ($this->sourceTableExists('wrong_names')) {
+            $this->insertWithIdentity('wrong_deduction_accounts', $this->sourceQuery('wrong_names')->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'payroll_bank_id' => $row->taj_id,
+                'installment_bank_id' => null,
+                'account_number' => $row->acc,
+                'name' => $row->name,
+                'created_by' => $row->user_id,
+                'created_at' => $row->created_at,
+                'updated_at' => $row->updated_at,
+            ])->all());
+
+            return;
+        }
+
+        $rows = DB::connection($this->target)
+            ->table('wrong_deductions')
+            ->whereNotNull('account_number')
+            ->where('account_number', '!=', '')
+            ->whereNotNull('name')
+            ->where('name', '!=', '')
+            ->orderBy('id')
+            ->get(['payroll_bank_id', 'account_number', 'name', 'created_by']);
+
+        $payload = [];
+        $seen = [];
+
+        foreach ($rows as $row) {
+            $key = ($row->payroll_bank_id ?? 0).'|'.$row->account_number;
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+
+            $payload[] = [
+                'payroll_bank_id' => $row->payroll_bank_id,
+                'installment_bank_id' => null,
+                'account_number' => $row->account_number,
+                'name' => $row->name,
+                'created_by' => $row->created_by,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if ($payload !== []) {
+            DB::connection($this->target)->table('wrong_deduction_accounts')->insert($payload);
+        }
+    }
+
+    protected function sourceTableExists(string $table): bool
+    {
+        try {
+            return DB::connection($this->source)->table($table)->limit(1)->exists();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     protected function mapMorphType(?string $type): string
@@ -766,6 +846,7 @@ class CompanyDataConverter
             'App\Models\Main' => 'installment_contract',
             'App\Models\Main_arc' => 'installment_contract_archive',
             'App\Models\Wrongkst' => 'wrong_deduction',
+            'App\Models\Overkst' => 'installment_surplus',
             default => (string) $type,
         };
     }
