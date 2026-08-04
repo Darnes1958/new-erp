@@ -35,12 +35,12 @@
 </head>
 <body>
 <div>
-    <label style="font-family: Amiri; font-size: 24pt; margin-right: 12px;">{{ $company?->display_name }}</label>
-    <br>
-    @if ($company?->address)
-        <label style="font-family: Amiri; font-size: 18pt; margin-right: 12px;">{{ $company->address }}</label>
-        <br>
-    @endif
+    @include('pdf.partials.company-header', [
+        'company' => $company,
+        'nameSize' => '24pt',
+        'suffixSize' => '18pt',
+        'addressSize' => '18pt',
+    ])
     <br>
     <br>
     <label style="margin-right: 12px;">فاتورة مشتريات رقم: {{ $invoice->id }}</label>

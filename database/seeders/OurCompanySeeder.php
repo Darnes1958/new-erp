@@ -10,8 +10,16 @@ class OurCompanySeeder extends Seeder
     public function run(): void
     {
         $companies = [
-            ['connection_name' => 'testERP', 'display_name' => 'Test ERP'],
-            ['connection_name' => 'Motafoek', 'display_name' => 'مطافئ'],
+            [
+                'connection_name' => 'testERP',
+                'display_name' => 'Test ERP',
+                'display_name_suffix' => null,
+            ],
+            [
+                'connection_name' => 'Motafoek',
+                'display_name' => 'مطافئ',
+                'display_name_suffix' => null,
+            ],
         ];
 
         foreach ($companies as $company) {

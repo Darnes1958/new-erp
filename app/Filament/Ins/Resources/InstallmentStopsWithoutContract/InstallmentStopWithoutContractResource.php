@@ -29,6 +29,11 @@ class InstallmentStopWithoutContractResource extends Resource
 
     protected static ?int $navigationSort = 8;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function getNavigationBadge(): ?string
     {
         return (string) InstallmentStopWithoutContract::query()->count();

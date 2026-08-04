@@ -37,9 +37,7 @@ class UserForm
                     ->visible(fn (string $operation): bool => $operation === 'create'),
                 Select::make('company')
                     ->label('الشركة')
-                    ->options(fn (): array => collect(config('erp.company_connections', []))
-                        ->mapWithKeys(fn (string $connection): array => [$connection => $connection])
-                        ->all())
+                    ->options(fn (): array => \App\Support\CompanyConnections::options())
                     ->searchable()
                     ->required()
                     ->live()

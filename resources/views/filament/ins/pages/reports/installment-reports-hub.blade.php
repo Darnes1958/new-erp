@@ -1,5 +1,9 @@
 <x-filament-panels::page>
     <div style="direction: rtl;" class="space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-300">
+            تقارير تحليلية عامة. التقارير التشغيلية (خطأ، فائض، إرجاع، إيقاف...) متاحة من قائمة «خصومات ومدفوعات».
+        </p>
+
         @foreach ($this->reports() as $report)
             <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <div class="flex flex-wrap items-start justify-between gap-3">

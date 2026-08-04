@@ -34,12 +34,12 @@
         </div>
 
         <div style="text-align: left; position: absolute; right: 0;">
-            <label style="font-family: Amiri; font-size: 24pt;">{{ $company?->display_name }}</label>
-            @if ($company?->address)
-                <div>
-                    <label style="font-family: Amiri; font-size: 18pt;">{{ $company->address }}</label>
-                </div>
-            @endif
+            @include('pdf.partials.company-header', [
+                'company' => $company,
+                'nameSize' => '24pt',
+                'suffixSize' => '18pt',
+                'addressSize' => '14pt',
+            ])
         </div>
     </div>
 

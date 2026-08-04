@@ -8,9 +8,11 @@ use App\Models\WrongDeduction;
 use App\Services\Installments\WrongDeductionService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -56,6 +58,25 @@ class WrongDeductionsTable
                 SelectFilter::make('status')
                     ->label('الحالة')
                     ->options(InstallmentRecordStatus::class),
+                Filter::make('deduction_date')
+                    ->label('التاريخ')
+                    ->schema([
+                        DatePicker::make('date_from')
+                            ->label('من تاريخ'),
+                        DatePicker::make('date_to')
+                            ->label('إلى تاريخ'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['date_from'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('deduction_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['date_to'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('deduction_date', '<=', $date),
+                            );
+                    }),
             ])
             ->recordUrl(null)
             ->recordActions([

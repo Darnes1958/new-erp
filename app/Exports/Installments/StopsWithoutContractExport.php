@@ -16,7 +16,8 @@ class StopsWithoutContractExport implements FromCollection, WithHeadings, WithMa
 {
     use RtlInstallmentSheet;
 
-    protected int $sequence = 0;
+    /** @var array<string, mixed>|null */
+    protected ?array $headerLayout = null;
 
     /**
      * @param  Collection<int, InstallmentStopWithoutContract>  $rows
@@ -26,7 +27,7 @@ class StopsWithoutContractExport implements FromCollection, WithHeadings, WithMa
         protected Collection $rows,
         protected ?OurCompany $company,
         protected array $filterLines,
-        protected string $reportDate,
+        protected string $reportTitle,
     ) {}
 
     public function collection(): Collection
@@ -36,41 +37,93 @@ class StopsWithoutContractExport implements FromCollection, WithHeadings, WithMa
 
     /**
      * @param  InstallmentStopWithoutContract  $row
-     * @return array<int, string|int|null>
+     * @return array<int, string|null>
      */
     public function map($row): array
     {
         return [
-            ++$this->sequence,
-            $row->payrollBank?->name,
-            $row->account_number,
-            $row->name,
+            Utf8Text::clean($row->name),
+            Utf8Text::clean($row->account_number),
+            Utf8Text::clean($row->payrollBank?->name),
             $row->stop_date?->format('Y-m-d'),
         ];
     }
 
     public function headings(): array
     {
-        $headings = [
-            [$this->company?->display_name ?? ''],
-            ['كشف إيقاف خصم بدون عقد حتى تاريخ: '.$this->reportDate],
-        ];
-
-        foreach ($this->filterLines as $line) {
-            $headings[] = [Utf8Text::clean($line)];
-        }
-
-        $headings[] = [''];
-        $headings[] = ['ت', 'المصرف التجميعي', 'رقم الحساب', 'الاسم', 'تاريخ الإيقاف'];
-
-        return $headings;
+        return $this->headerLayout()['headings'];
     }
 
     public function registerEvents(): array
     {
+        $layout = $this->headerLayout();
+
         return $this->rtlSheetEvents(
-            headerRow: 4 + count($this->filterLines),
-            columnCount: 5,
+            headerRow: $layout['headerRow'],
+            columnCount: 4,
+            columnWidths: [
+                'A' => 32,
+                'B' => 20,
+                'C' => 40,
+                'D' => 14,
+            ],
+            rightAlignedRows: $layout['rightAlignedRows'],
+            centeredInfoRows: $layout['centeredInfoRows'],
         );
+    }
+
+    /**
+     * @return array{
+     *     headings: array<int, array<int, string>>,
+     *     headerRow: int,
+     *     rightAlignedRows: array<int, int>,
+     *     centeredInfoRows: array<int, int>
+     * }
+     */
+    protected function headerLayout(): array
+    {
+        if ($this->headerLayout !== null) {
+            return $this->headerLayout;
+        }
+
+        $headings = [];
+        $rightAlignedRows = [];
+        $centeredInfoRows = [];
+        $row = 1;
+
+        if ($this->company) {
+            foreach ($this->company->excelCompanyRows() as $companyRow) {
+                $headings[] = $companyRow;
+                $rightAlignedRows[] = $row++;
+            }
+        } else {
+            $headings[] = [''];
+            $rightAlignedRows[] = $row++;
+        }
+
+        $headings[] = [''];
+        $row++;
+        $headings[] = [''];
+        $row++;
+
+        $headings[] = [$this->reportTitle];
+        $centeredInfoRows[] = $row++;
+
+        foreach ($this->filterLines as $line) {
+            $headings[] = [Utf8Text::clean($line)];
+            $rightAlignedRows[] = $row++;
+        }
+
+        $headings[] = [''];
+        $row++;
+
+        $headings[] = ['اسم الزبون', 'رقم الحساب', 'المصرف التجميعي', 'تاريخ الإيقاف'];
+
+        return $this->headerLayout = [
+            'headings' => $headings,
+            'headerRow' => $row,
+            'rightAlignedRows' => $rightAlignedRows,
+            'centeredInfoRows' => $centeredInfoRows,
+        ];
     }
 }

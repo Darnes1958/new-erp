@@ -2,8 +2,6 @@
 
 namespace App\Filament\Ins\Pages\Reports;
 
-use App\Filament\Ins\Resources\InstallmentStopsWithoutContract\InstallmentStopWithoutContractResource;
-use App\Filament\Ins\Resources\WrongDeductions\WrongDeductionResource;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
@@ -38,23 +36,13 @@ class InstallmentReportsHub extends Page
     }
 
     /**
+     * تقارير عامة — التقارير التشغيلية (خطأ، فائض، إرجاع، إيقاف...) متاحة من القائمة أعلاه.
+     *
      * @return array<int, array{title: string, description: string, url?: string, status: string}>
      */
     public function reports(): array
     {
         return [
-            [
-                'title' => 'أقساط واردة بالخطأ',
-                'description' => 'طباعة PDF أو Excel لما يظهر على الشاشة حسب الفلتر.',
-                'url' => WrongDeductionResource::getUrl('index'),
-                'status' => 'ready',
-            ],
-            [
-                'title' => 'إيقاف خصم بدون عقد',
-                'description' => 'طباعة PDF أو Excel لما يظهر على الشاشة حسب الفلتر.',
-                'url' => InstallmentStopWithoutContractResource::getUrl('index'),
-                'status' => 'ready',
-            ],
             [
                 'title' => 'تقرير عن عقد',
                 'description' => 'طباعة عقد تقسيط واحد مع تفاصيله.',
@@ -62,8 +50,9 @@ class InstallmentReportsHub extends Page
             ],
             [
                 'title' => 'تقارير عن مصرف',
-                'description' => 'كشف بالأسماء، المسددة، المتأخرة، وغيرها.',
-                'status' => 'soon',
+                'description' => 'كشف بالأسماء، المسددة، المتأخرة، المحصلة، وغيرها.',
+                'url' => BankReportsPage::getUrl(),
+                'status' => 'ready',
             ],
             [
                 'title' => 'إجمالي المصارف',

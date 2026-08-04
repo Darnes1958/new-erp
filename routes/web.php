@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\InvoicePdfController;
+use App\Support\FilamentLogin;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Route;
 
@@ -9,8 +10,10 @@ Route::get('/', function () {
         return redirect(Filament::getPanel('market')->getUrl());
     }
 
-    return redirect(Filament::getPanel('market')->getLoginUrl());
+    return redirect(FilamentLogin::url(request()));
 });
+
+Route::redirect('/login', '/market/login')->name('login');
 
 Route::middleware('auth')->group(function (): void {
     Route::get('/pdf/purchase-invoice/{purchaseInvoice}', [InvoicePdfController::class, 'purchase'])

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Ins\Resources\InstallmentStopsWithoutContract\Pages;
 
+use App\Filament\Ins\Pages\RecordInstallmentStopWithoutContract;
 use App\Filament\Ins\Resources\InstallmentStopsWithoutContract\InstallmentStopWithoutContractResource;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
@@ -50,7 +51,7 @@ class CreateInstallmentStopWithoutContract extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        return static::getResource()::getUrl('create');
+        return RecordInstallmentStopWithoutContract::getUrl();
     }
 
     protected function getCreatedNotificationTitle(): ?string

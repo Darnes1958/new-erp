@@ -81,14 +81,23 @@ class InstallmentSurplusesTable
                     ->label('الحالة')
                     ->options(InstallmentRecordStatus::class),
                 Filter::make('surplus_date')
+                    ->label('التاريخ')
                     ->schema([
-                        DatePicker::make('from')->label('من تاريخ'),
-                        DatePicker::make('until')->label('إلى تاريخ'),
+                        DatePicker::make('date_from')
+                            ->label('من تاريخ'),
+                        DatePicker::make('date_to')
+                            ->label('إلى تاريخ'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return $query
-                            ->when($data['from'], fn (Builder $q, $date) => $q->whereDate('surplus_date', '>=', $date))
-                            ->when($data['until'], fn (Builder $q, $date) => $q->whereDate('surplus_date', '<=', $date));
+                            ->when(
+                                $data['date_from'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('surplus_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['date_to'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('surplus_date', '<=', $date),
+                            );
                     }),
             ])
             ->recordUrl(null)

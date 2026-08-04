@@ -13,7 +13,10 @@ use App\Services\Installments\InstallmentReturnService;
 use App\Support\Filament\TableSummaries;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -80,6 +83,30 @@ class InstallmentReturnsTable
                     ->label('رقم الحافظة')
                     ->toggleable(),
             ])
+            ->filters([
+                SelectFilter::make('status')
+                    ->label('البيان')
+                    ->options(InstallmentReturnType::class),
+                Filter::make('suspended_date')
+                    ->label('التاريخ')
+                    ->schema([
+                        DatePicker::make('date_from')
+                            ->label('من تاريخ'),
+                        DatePicker::make('date_to')
+                            ->label('إلى تاريخ'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['date_from'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('suspended_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['date_to'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('suspended_date', '<=', $date),
+                            );
+                    }),
+            ])
             ->recordUrl(null)
             ->recordActions([
                 Action::make('undoReturn')
@@ -107,7 +134,7 @@ class InstallmentReturnsTable
             ]);
     }
 
-    protected static function customerLabel(InstallmentSuspended $record): string
+    public static function customerLabel(InstallmentSuspended $record): string
     {
         if ($record->status === InstallmentReturnType::FromCancelled) {
             return $record->cancelledContract?->customer?->name

@@ -2,8 +2,7 @@
 
 @section('content')
     <div style="text-align: center;">
-        <label style="font-size: 14pt; margin-right: 12px;">تقرير بالأقساط الواردة بالخطأ حتى تاريخ:</label>
-        <label style="font-size: 10pt;">{{ $reportDate }}</label>
+        <label style="font-size: 14pt;">{{ $reportTitle }}</label>
     </div>
 
     @include('pdf.installments.partials.filter-lines', ['filterLines' => $filterLines ?? []])

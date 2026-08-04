@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\FilamentAuthenticate;
+use App\Http\Middleware\FilamentAuthenticateSession;
 use App\Filament\Market\Pages\InpBuy\InpBuy;
 use App\Filament\Market\Pages\InpSell\InpSell;
 use App\Filament\Market\Pages\InpSellOffer\InpSellOffer;
@@ -9,8 +11,6 @@ use App\Filament\Market\Pages\ListSalesReturns;
 use App\Filament\Market\Pages\QuickSell\QuickSell;
 use App\Filament\Market\Support\MarketNavigationGroup;
 use App\Filament\Widgets\PanelSwitcherWidget;
-use Filament\Http\Middleware\Authenticate;
-use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
@@ -75,7 +75,7 @@ class MarketPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
-                AuthenticateSession::class,
+                FilamentAuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
                 SubstituteBindings::class,
@@ -83,7 +83,7 @@ class MarketPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                FilamentAuthenticate::class,
             ]);
     }
 }

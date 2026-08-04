@@ -2,9 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\FilamentAuthenticate;
+use App\Http\Middleware\FilamentAuthenticateSession;
 use App\Filament\Widgets\PanelSwitcherWidget;
-use Filament\Http\Middleware\Authenticate;
-use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
@@ -12,6 +12,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -31,7 +32,7 @@ class InsPanelProvider extends PanelProvider
             ->maxContentWidth('full')
             ->breadcrumbs(false)
             ->colors([
-                'primary' => Color::Emerald,
+                'primary' => Color::Amber,
             ])
             ->discoverResources(
                 in: app_path('Filament/Ins/Resources'),
@@ -60,7 +61,7 @@ class InsPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
-                AuthenticateSession::class,
+                FilamentAuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
                 SubstituteBindings::class,
@@ -68,7 +69,21 @@ class InsPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
-            ]);
+                FilamentAuthenticate::class,
+            ])
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => <<<'HTML'
+                    <style>
+                        .fi-ins-export-header-page .fi-header-actions-ctn > .fi-ac {
+                            direction: ltr !important;
+                            justify-content: flex-start !important;
+                            gap: 1.5rem !important;
+                            width: auto !important;
+                            flex: 0 0 auto !important;
+                        }
+                    </style>
+                HTML,
+            );
     }
 }

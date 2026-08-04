@@ -4,46 +4,142 @@ namespace App\Filament\Ins\Support;
 
 use App\Support\PdfDownload;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
+use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class InstallmentListPrintActions
 {
+    public static function create(): CreateAction
+    {
+        return CreateAction::make()
+            ->label('إضافة')
+            ->color('primary');
+    }
+
+    public static function wrongDeductionsExports(): ActionGroup
+    {
+        return self::exportGroup(
+            self::wrongDeductionsPdf(),
+            self::wrongDeductionsExcel(),
+        );
+    }
+
+    public static function installmentSurplusesExports(): ActionGroup
+    {
+        return self::exportGroup(
+            self::installmentSurplusesPdf(),
+            self::installmentSurplusesExcel(),
+        );
+    }
+
+    public static function stopsWithoutContractExports(): ActionGroup
+    {
+        return self::exportGroup(
+            self::stopsWithoutContractPdf(),
+            self::stopsWithoutContractExcel(),
+        );
+    }
+
+    public static function installmentReturnsExports(): ActionGroup
+    {
+        return self::exportGroup(
+            self::installmentReturnsPdf(),
+            self::installmentReturnsExcel(),
+        );
+    }
+
     public static function wrongDeductionsPdf(): Action
     {
-        return Action::make('printWrongDeductionsPdf')
-            ->label('طباعة PDF')
-            ->icon('heroicon-o-printer')
-            ->color('info')
-            ->action(fn ($livewire) => self::downloadWrongDeductionsPdf($livewire));
+        return self::pdfAction(
+            'printWrongDeductionsPdf',
+            fn ($livewire) => self::downloadWrongDeductionsPdf($livewire),
+        );
     }
 
     public static function wrongDeductionsExcel(): Action
     {
-        return Action::make('exportWrongDeductionsExcel')
-            ->label('تصدير Excel')
-            ->icon('heroicon-o-table-cells')
-            ->color('success')
-            ->action(fn ($livewire) => self::downloadWrongDeductionsExcel($livewire));
+        return self::excelAction(
+            'exportWrongDeductionsExcel',
+            fn ($livewire) => self::downloadWrongDeductionsExcel($livewire),
+        );
+    }
+
+    public static function installmentSurplusesPdf(): Action
+    {
+        return self::pdfAction(
+            'printInstallmentSurplusesPdf',
+            fn ($livewire) => self::downloadInstallmentSurplusesPdf($livewire),
+        );
+    }
+
+    public static function installmentSurplusesExcel(): Action
+    {
+        return self::excelAction(
+            'exportInstallmentSurplusesExcel',
+            fn ($livewire) => self::downloadInstallmentSurplusesExcel($livewire),
+        );
     }
 
     public static function stopsWithoutContractPdf(): Action
     {
-        return Action::make('printStopsWithoutContractPdf')
-            ->label('طباعة PDF')
-            ->icon('heroicon-o-printer')
-            ->color('info')
-            ->action(fn ($livewire) => self::downloadStopsWithoutContractPdf($livewire));
+        return self::pdfAction(
+            'printStopsWithoutContractPdf',
+            fn ($livewire) => self::downloadStopsWithoutContractPdf($livewire),
+        );
     }
 
     public static function stopsWithoutContractExcel(): Action
     {
-        return Action::make('exportStopsWithoutContractExcel')
-            ->label('تصدير Excel')
+        return self::excelAction(
+            'exportStopsWithoutContractExcel',
+            fn ($livewire) => self::downloadStopsWithoutContractExcel($livewire),
+        );
+    }
+
+    public static function installmentReturnsPdf(): Action
+    {
+        return self::pdfAction(
+            'printInstallmentReturnsPdf',
+            fn ($livewire) => self::downloadInstallmentReturnsPdf($livewire),
+        );
+    }
+
+    public static function installmentReturnsExcel(): Action
+    {
+        return self::excelAction(
+            'exportInstallmentReturnsExcel',
+            fn ($livewire) => self::downloadInstallmentReturnsExcel($livewire),
+        );
+    }
+
+    protected static function pdfAction(string $name, callable $action): Action
+    {
+        return Action::make($name)
+            ->label('PDF')
+            ->icon('heroicon-o-printer')
+            ->color('info')
+            ->size(Size::Small)
+            ->action($action);
+    }
+
+    protected static function excelAction(string $name, callable $action): Action
+    {
+        return Action::make($name)
+            ->label('Excl')
             ->icon('heroicon-o-table-cells')
             ->color('success')
-            ->action(fn ($livewire) => self::downloadStopsWithoutContractExcel($livewire));
+            ->size(Size::Small)
+            ->action($action);
+    }
+
+    protected static function exportGroup(Action $pdf, Action $excel): ActionGroup
+    {
+        return ActionGroup::make([$pdf, $excel])
+            ->buttonGroup();
     }
 
     protected static function downloadWrongDeductionsPdf(object $livewire): mixed
@@ -62,7 +158,11 @@ class InstallmentListPrintActions
 
         return PdfDownload::streamed(
             app(\App\Services\Pdf\InstallmentPdfService::class)
-                ->wrongDeductionsReport($rows, InstallmentReportFilters::activeFilterLines($livewire))
+                ->wrongDeductionsReport(
+                    $rows,
+                    InstallmentReportFilters::activeFilterLines($livewire),
+                    WrongDeductionReportTitle::fromLivewire($livewire),
+                )
         );
     }
 
@@ -81,7 +181,57 @@ class InstallmentListPrintActions
         }
 
         return app(\App\Services\Excel\InstallmentExcelService::class)
-            ->wrongDeductionsReport($rows, InstallmentReportFilters::activeFilterLines($livewire));
+            ->wrongDeductionsReport(
+                $rows,
+                InstallmentReportFilters::activeFilterLines($livewire),
+                WrongDeductionReportTitle::fromLivewire($livewire),
+            );
+    }
+
+    protected static function downloadInstallmentSurplusesPdf(object $livewire): mixed
+    {
+        $rows = self::filteredRows($livewire, with: ['contractable.customer']);
+
+        if ($rows === null) {
+            return null;
+        }
+
+        if ($rows->isEmpty()) {
+            self::notifyEmpty();
+
+            return null;
+        }
+
+        return PdfDownload::streamed(
+            app(\App\Services\Pdf\InstallmentPdfService::class)
+                ->installmentSurplusesReport(
+                    $rows,
+                    InstallmentReportFilters::activeFilterLines($livewire),
+                    InstallmentSurplusReportTitle::fromLivewire($livewire),
+                )
+        );
+    }
+
+    protected static function downloadInstallmentSurplusesExcel(object $livewire): mixed
+    {
+        $rows = self::filteredRows($livewire, with: ['contractable.customer']);
+
+        if ($rows === null) {
+            return null;
+        }
+
+        if ($rows->isEmpty()) {
+            self::notifyEmpty();
+
+            return null;
+        }
+
+        return app(\App\Services\Excel\InstallmentExcelService::class)
+            ->installmentSurplusesReport(
+                $rows,
+                InstallmentReportFilters::activeFilterLines($livewire),
+                InstallmentSurplusReportTitle::fromLivewire($livewire),
+            );
     }
 
     protected static function downloadStopsWithoutContractPdf(object $livewire): mixed
@@ -119,7 +269,57 @@ class InstallmentListPrintActions
         }
 
         return app(\App\Services\Excel\InstallmentExcelService::class)
-            ->stopsWithoutContractReport($rows, InstallmentReportFilters::activeFilterLines($livewire));
+            ->stopsWithoutContractReport(
+                $rows,
+                InstallmentReportFilters::activeFilterLines($livewire),
+                InstallmentStopWithoutContractReportTitle::fromLivewire($livewire),
+            );
+    }
+
+    protected static function downloadInstallmentReturnsPdf(object $livewire): mixed
+    {
+        $rows = self::filteredRows($livewire);
+
+        if ($rows === null) {
+            return null;
+        }
+
+        if ($rows->isEmpty()) {
+            self::notifyEmpty();
+
+            return null;
+        }
+
+        return PdfDownload::streamed(
+            app(\App\Services\Pdf\InstallmentPdfService::class)
+                ->installmentReturnsReport(
+                    $rows,
+                    InstallmentReportFilters::activeFilterLines($livewire),
+                    InstallmentReturnReportTitle::fromLivewire($livewire),
+                )
+        );
+    }
+
+    protected static function downloadInstallmentReturnsExcel(object $livewire): mixed
+    {
+        $rows = self::filteredRows($livewire);
+
+        if ($rows === null) {
+            return null;
+        }
+
+        if ($rows->isEmpty()) {
+            self::notifyEmpty();
+
+            return null;
+        }
+
+        return app(\App\Services\Excel\InstallmentExcelService::class)
+            ->installmentReturnsReport(
+                $rows,
+                InstallmentReportFilters::activeFilterLines($livewire),
+                InstallmentReturnReportTitle::fromLivewire($livewire),
+            );
     }
 
     /**

@@ -37,12 +37,7 @@
 </head>
 <body>
 <div>
-    <label style="font-size: 20pt; margin-right: 12px;">{{ \App\Support\Utf8Text::clean($company?->display_name) }}</label>
-    @if ($company?->address)
-        <div>
-            <label style="font-size: 14pt; margin-right: 12px;">{{ \App\Support\Utf8Text::clean($company->address) }}</label>
-        </div>
-    @endif
+    @include('pdf.partials.company-header', ['company' => $company ?? null])
 </div>
 <br>
 
