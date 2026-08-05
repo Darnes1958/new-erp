@@ -57,7 +57,26 @@ class InstallmentReportsHub extends Page
             [
                 'title' => 'إجمالي المصارف',
                 'description' => 'ملخص أرقام المصارف مع تصدير Excel.',
-                'status' => 'soon',
+                'url' => BankTotalsReportPage::getUrl(),
+                'status' => 'ready',
+            ],
+            [
+                'title' => 'عمولة المصارف',
+                'description' => 'عمولة المصارف خلال فترة محددة.',
+                'url' => BankCommissionReportPage::getUrl(),
+                'status' => 'ready',
+            ],
+            [
+                'title' => 'إجمالي الفروع',
+                'description' => 'ملخص أرقام الفروع حسب الحسابات التجميعية.',
+                'url' => BranchTotalsReportPage::getUrl(),
+                'status' => 'ready',
+            ],
+            [
+                'title' => 'عمولة الفروع',
+                'description' => 'عمولة المصرف للفروع خلال فترة محددة.',
+                'url' => BranchCommissionReportPage::getUrl(),
+                'status' => 'ready',
             ],
         ];
     }

@@ -82,6 +82,35 @@ class InsPanelProvider extends PanelProvider
                             width: auto !important;
                             flex: 0 0 auto !important;
                         }
+
+                        .ins-report-toolbar {
+                            display: flex;
+                            flex-wrap: wrap;
+                            align-items: flex-start;
+                            justify-content: space-between;
+                            gap: 1rem;
+                        }
+
+                        .ins-report-toolbar__filters {
+                            flex: 1 1 auto;
+                            min-width: 280px;
+                            max-width: 520px;
+                        }
+
+                        .ins-report-toolbar__filters--branch {
+                            max-width: 360px;
+                        }
+
+                        .ins-report-toolbar__filters--wide {
+                            max-width: 720px;
+                        }
+
+                        .ins-report-toolbar__exports {
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: 0.75rem;
+                            direction: ltr;
+                        }
                     </style>
                 HTML,
             );

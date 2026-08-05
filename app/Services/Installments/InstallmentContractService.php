@@ -41,6 +41,14 @@ class InstallmentContractService
             ->with('customer');
     }
 
+    public static function eligibleMergeSalesInvoicesQuery()
+    {
+        $customerIds = InstallmentContract::query()->distinct()->pluck('customer_id');
+
+        return static::eligibleSalesInvoicesQuery()
+            ->whereIn('customer_id', $customerIds);
+    }
+
     public static function eligibleSalesInvoicesQueryForEdit(int $currentInvoiceId)
     {
         $installmentPaymentId = (int) config('erp.payment_method_codes.installment');
@@ -160,6 +168,14 @@ class InstallmentContractService
     }
 
     public function previousCustomerContract(int $customerId): ?InstallmentContract
+    {
+        return InstallmentContract::query()
+            ->where('customer_id', $customerId)
+            ->orderBy('contract_start')
+            ->first();
+    }
+
+    public function activeCustomerContract(int $customerId): ?InstallmentContract
     {
         return InstallmentContract::query()
             ->where('customer_id', $customerId)

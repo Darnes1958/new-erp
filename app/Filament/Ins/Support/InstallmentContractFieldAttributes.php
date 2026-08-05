@@ -7,6 +7,16 @@ class InstallmentContractFieldAttributes
     /**
      * @return array<string, string>
      */
+    public static function enterFocusField(string $fieldId): array
+    {
+        return [
+            'x-on:keydown.enter.prevent' => '$wire.focusField(\''.$fieldId.'\')',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
     public static function installmentCountEnterKey(): array
     {
         return [
