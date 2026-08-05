@@ -24,7 +24,7 @@
                 <div style="flex: 1 1 auto; min-width: 0;">
                     {{ $this->reportForm }}
                 </div>
-                <div style="flex: 0 0 auto; padding-bottom: 0.35rem; display: flex; gap: 0.75rem;">
+                <div style="flex: 0 0 auto; padding-bottom: 0.35rem; display: flex; align-items: center; gap: 0.25rem;">
                     {{ $this->printAction }}
                     {{ $this->exportExcelAction }}
                 </div>

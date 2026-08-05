@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InstallmentBank extends CompanyModel
 {
@@ -11,5 +12,10 @@ class InstallmentBank extends CompanyModel
     public function payrollBank(): BelongsTo
     {
         return $this->belongsTo(PayrollBank::class);
+    }
+
+    public function installmentContracts(): HasMany
+    {
+        return $this->hasMany(InstallmentContract::class);
     }
 }

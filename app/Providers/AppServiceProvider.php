@@ -118,7 +118,32 @@ class AppServiceProvider extends ServiceProvider
 
         FilamentView::registerRenderHook(
             PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
-            fn (): string => Blade::render('@livewire(\'company-switcher\')'),
+            fn (): string => Blade::render(
+                <<<'BLADE'
+                    <div class="fi-topbar-panel-tools">
+                        @livewire('panel-switcher')
+                        @livewire('company-switcher')
+                    </div>
+                BLADE
+            ),
+        );
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::HEAD_END,
+            fn (): string => <<<'HTML'
+                <style>
+                    .fi-topbar-panel-tools {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.75rem;
+                        margin-inline-end: 0.5rem;
+                    }
+
+                    .fi-panel-switcher .fi-fo-toggle-buttons {
+                        margin: 0;
+                    }
+                </style>
+                HTML,
         );
 
         InstallmentDeduction::observe(InstallmentDeductionObserver::class);

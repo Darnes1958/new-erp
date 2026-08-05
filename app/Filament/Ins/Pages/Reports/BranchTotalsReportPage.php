@@ -2,6 +2,7 @@
 
 namespace App\Filament\Ins\Pages\Reports;
 
+use App\Filament\Ins\Support\InstallmentListPrintActions;
 use App\Models\Warehouse;
 use App\Services\Excel\InstallmentExcelService;
 use App\Services\Installments\InstallmentBranchTotalsReportService;
@@ -97,22 +98,12 @@ class BranchTotalsReportPage extends Page implements HasActions, HasForms, HasTa
 
     public function printAction(): Action
     {
-        return Action::make('print')
-            ->label('طباعة')
-            ->button()
-            ->icon(Heroicon::OutlinedPrinter)
-            ->color('info')
-            ->action(fn () => $this->downloadPdf());
+        return InstallmentListPrintActions::compactPrint('print', fn () => $this->downloadPdf());
     }
 
     public function exportExcelAction(): Action
     {
-        return Action::make('exportExcel')
-            ->label('Excl')
-            ->button()
-            ->icon(Heroicon::OutlinedTableCells)
-            ->color('success')
-            ->action(fn () => $this->downloadExcel());
+        return InstallmentListPrintActions::compactExcel('exportExcel', fn () => $this->downloadExcel());
     }
 
     public function updatedWarehouseId(): void

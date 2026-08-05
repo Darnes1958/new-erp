@@ -63,6 +63,16 @@ class InstallmentStopReportService
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function filterLines(PayrollBank $payrollBank): array
+    {
+        return [
+            'للمصرف التجميعي : '.$payrollBank->name,
+        ];
+    }
+
+    /**
      * @return array{count: int, contract_total: float}
      */
     public function bankSummary(int $filterBy, ?int $installmentBankId, ?int $payrollBankId): array

@@ -8,6 +8,8 @@ class CompanySetting extends Model
 {
     public $incrementing = false;
 
+    public $timestamps = false;
+
     protected $primaryKey = 'company';
 
     protected $keyType = 'string';
@@ -24,6 +26,13 @@ class CompanySetting extends Model
         'auto_price_update',
         'user_message',
         'alert_message',
+        'sidebar_group_gap_px',
+        'sidebar_item_gap_px',
+        'sidebar_item_padding_y_px',
+        'table_cell_padding_y_px',
+        'table_header_padding_y_px',
+        'table_font_size_px',
+        'table_header_font_size_px',
     ];
 
     protected function casts(): array

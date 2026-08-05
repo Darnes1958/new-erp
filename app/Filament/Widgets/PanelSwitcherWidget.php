@@ -2,7 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Facades\Filament;
+use App\Support\PanelNavigation;
 use Filament\Widgets\Widget;
 
 class PanelSwitcherWidget extends Widget
@@ -17,35 +17,24 @@ class PanelSwitcherWidget extends Widget
 
     protected function getViewData(): array
     {
-        $current = Filament::getCurrentPanel()?->getId();
-
         return [
-            'panels' => [
-                [
-                    'id' => 'market',
-                    'label' => 'المبيعات',
-                    'description' => 'فواتير الشراء والبيع، الزبائن، المخازن',
-                    'url' => Filament::getPanel('market')->getUrl(),
-                    'active' => $current === 'market',
-                    'color' => 'amber',
-                ],
-                [
-                    'id' => 'ins',
-                    'label' => 'التقسيط',
-                    'description' => 'عقود الأقساط، الخصومات، الحافظات',
-                    'url' => Filament::getPanel('ins')->getUrl(),
-                    'active' => $current === 'ins',
-                    'color' => 'emerald',
-                ],
-                [
-                    'id' => 'admin',
-                    'label' => 'الإدارة',
-                    'description' => 'المستخدمون وإعدادات الشركة',
-                    'url' => Filament::getPanel('admin')->getUrl(),
-                    'active' => $current === 'admin',
-                    'color' => 'slate',
-                ],
-            ],
+            'panels' => collect(PanelNavigation::availablePanels())
+                ->map(fn (array $panel): array => [
+                    ...$panel,
+                    'description' => match ($panel['id']) {
+                        'market' => 'فواتير الشراء والبيع، الزبائن، المخازن',
+                        'ins' => 'عقود الأقساط، الخصومات، الحافظات',
+                        'admin' => 'المستخدمون وإعدادات الشركة',
+                        default => '',
+                    },
+                    'color' => match ($panel['id']) {
+                        'market' => 'amber',
+                        'ins' => 'emerald',
+                        'admin' => 'slate',
+                        default => 'gray',
+                    },
+                ])
+                ->all(),
         ];
     }
 }

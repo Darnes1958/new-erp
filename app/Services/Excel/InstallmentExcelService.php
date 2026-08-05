@@ -2,10 +2,13 @@
 
 namespace App\Services\Excel;
 
+use App\Enums\BankReportType;
 use App\Exports\Installments\BankCommissionExport;
+use App\Exports\Installments\BankReportExport;
 use App\Exports\Installments\BankTotalsExport;
 use App\Exports\Installments\BranchCommissionExport;
 use App\Exports\Installments\InstallmentReturnsExport;
+use App\Exports\Installments\InstallmentStopExport;
 use App\Exports\Installments\InstallmentSurplusesExport;
 use App\Exports\Installments\StopsWithoutContractExport;
 use App\Exports\Installments\WrongDeductionsExport;
@@ -144,6 +147,50 @@ class InstallmentExcelService
                 reportTitle: $reportTitle ?? 'عمولة الفروع',
             ),
             'branch-commission.xlsx',
+        );
+    }
+
+    /**
+     * @param  Collection<int, \App\Models\InstallmentContract|\App\Models\InstallmentDeduction>  $rows
+     * @param  array<int, string>  $filterLines
+     */
+    public function bankReport(
+        Collection $rows,
+        BankReportType $type,
+        array $filterLines = [],
+        ?string $reportTitle = null,
+    ): BinaryFileResponse {
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new BankReportExport(
+                rows: $rows,
+                type: $type,
+                company: OurCompany::forCurrentUser(),
+                filterLines: $filterLines,
+                reportTitle: $reportTitle ?? $type->pdfTitle(),
+            ),
+            'bank-report-'.$type->value.'.xlsx',
+        );
+    }
+
+    /**
+     * @param  Collection<int, \App\Models\InstallmentContract>  $rows
+     * @param  array<int, string>  $filterLines
+     */
+    public function installmentStopReport(
+        Collection $rows,
+        array $filterLines = [],
+        ?string $reportTitle = null,
+    ): BinaryFileResponse {
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new InstallmentStopExport(
+                rows: $rows->sortBy([
+                    ['id', 'asc'],
+                ])->values(),
+                company: OurCompany::forCurrentUser(),
+                filterLines: $filterLines,
+                reportTitle: $reportTitle ?? ('كشف إيقاف خصم الأقساط حتى تاريخ: '.now()->toDateString()),
+            ),
+            'installment-stop.xlsx',
         );
     }
 }

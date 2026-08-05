@@ -50,7 +50,7 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'خصومات ومدفوعات';
+    protected static string|\UnitEnum|null $navigationGroup = 'أقساط';
 
     protected static ?int $navigationSort = 1;
 

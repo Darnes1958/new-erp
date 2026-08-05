@@ -3,12 +3,13 @@
 namespace App\Filament\Ins\Pages\Reports;
 
 use App\Enums\BankReportType;
+use App\Filament\Ins\Support\InstallmentListPrintActions;
 use App\Models\InstallmentBank;
 use App\Models\PayrollBank;
+use App\Services\Excel\InstallmentExcelService;
 use App\Services\Installments\InstallmentBankReportService;
 use App\Services\Pdf\InstallmentBankReportPdfService;
 use App\Support\PdfDownload;
-use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\Checkbox;
@@ -21,6 +22,7 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Summarizer;
@@ -110,66 +112,78 @@ class BankReportsPage extends Page implements HasActions, HasForms, HasTable
     {
         return $schema
             ->components([
-                Radio::make('filterBy')
-                    ->hiddenLabel()
-                    ->inline()
-                    ->live()
-                    ->options([
-                        2 => 'بالتجميعي',
-                        1 => 'بفروع المصارف',
+                Grid::make()
+                    ->schema([
+                        Radio::make('filterBy')
+                            ->hiddenLabel()
+                            ->inline()
+                            ->live()
+                            ->options([
+                                2 => 'بالتجميعي',
+                                1 => 'بالفروع',
+                            ])
+                            ->columnSpan(2),
+                        Select::make('reportType')
+                            ->columnSpan(3)
+                            ->hiddenLabel()
+                            ->prefix('التقرير')
+                            ->options(BankReportType::options())
+                            ->live(),
+                        Select::make('installmentBankId')
+                            ->columnSpan(4)
+                            ->hiddenLabel()
+                            ->prefix('فرع المصرف')
+                            ->options(fn (): array => InstallmentBank::query()->orderBy('name')->pluck('name', 'id')->all())
+                            ->searchable()
+                            ->live()
+                            ->visible(fn (): bool => $this->filterBy === 1),
+                        Select::make('payrollBankId')
+                            ->columnSpan(4)
+                            ->hiddenLabel()
+                            ->prefix('المصرف التجميعي')
+                            ->options(fn (): array => PayrollBank::query()->orderBy('name')->pluck('name', 'id')->all())
+                            ->searchable()
+                            ->live()
+                            ->visible(fn (): bool => $this->filterBy === 2),
+                        Actions::make([
+                            InstallmentListPrintActions::compactPrint('print', fn () => $this->downloadPdf()),
+                            InstallmentListPrintActions::compactExcel('exportExcel', fn () => $this->downloadExcel()),
+                        ])
+                            ->columnSpan(1)
+                            ->extraAttributes(['class' => 'ins-compact-exports']),
                     ])
-                    ->columnSpan(2),
-                Select::make('reportType')
-                    ->columnSpan(2)
-                    ->hiddenLabel()
-                    ->prefix('التقرير')
-                    ->options(BankReportType::options())
-                    ->live(),
-                Select::make('installmentBankId')
-                    ->columnSpan(2)
-                    ->hiddenLabel()
-                    ->prefix('فرع المصرف')
-                    ->options(fn (): array => InstallmentBank::query()->orderBy('name')->pluck('name', 'id')->all())
-                    ->searchable()
-                    ->live()
-                    ->visible(fn (): bool => $this->filterBy === 1),
-                Select::make('payrollBankId')
-                    ->columnSpan(2)
-                    ->hiddenLabel()
-                    ->prefix('المصرف التجميعي')
-                    ->options(fn (): array => PayrollBank::query()->orderBy('name')->pluck('name', 'id')->all())
-                    ->searchable()
-                    ->live()
-                    ->visible(fn (): bool => $this->filterBy === 2),
-                TextInput::make('threshold')
-                    ->hiddenLabel()
-                    ->prefix(fn (): string => $this->selectedReportType()->thresholdLabel())
-                    ->numeric()
-                    ->live()
-                    ->visible(fn (): bool => $this->selectedReportType()->usesThreshold()),
-                Checkbox::make('notPaidOnly')
-                    ->label('لم تسدد بعد')
-                    ->live()
-                    ->visible(fn (): bool => $this->reportType === BankReportType::Late->value),
-                DatePicker::make('dateFrom')
-                    ->hiddenLabel()
-                    ->prefix('من')
-                    ->live()
-                    ->visible(fn (): bool => $this->selectedReportType()->usesDateRange()),
-                DatePicker::make('dateTo')
-                    ->hiddenLabel()
-                    ->prefix('إلي')
-                    ->live()
-                    ->visible(fn (): bool => $this->selectedReportType()->usesDateRange()),
-                Actions::make([
-                    Action::make('print')
-                        ->label('طباعة')
-                        ->icon(Heroicon::OutlinedPrinter)
-                        ->color('info')
-                        ->action(fn () => $this->downloadPdf()),
-                ]),
+                    ->columns(10),
+                Grid::make()
+                    ->schema([
+                        TextInput::make('threshold')
+                            ->columnSpan(3)
+                            ->hiddenLabel()
+                            ->prefix(fn (): string => $this->selectedReportType()->thresholdLabel())
+                            ->numeric()
+                            ->live()
+                            ->visible(fn (): bool => $this->selectedReportType()->usesThreshold()),
+                        Checkbox::make('notPaidOnly')
+                            ->label('لم تسدد بعد')
+                            ->columnSpan(2)
+                            ->live()
+                            ->visible(fn (): bool => $this->reportType === BankReportType::Late->value),
+                        DatePicker::make('dateFrom')
+                            ->columnSpan(2)
+                            ->hiddenLabel()
+                            ->prefix('من')
+                            ->live()
+                            ->visible(fn (): bool => $this->selectedReportType()->usesDateRange()),
+                        DatePicker::make('dateTo')
+                            ->columnSpan(2)
+                            ->hiddenLabel()
+                            ->prefix('إلي')
+                            ->live()
+                            ->visible(fn (): bool => $this->selectedReportType()->usesDateRange()),
+                    ])
+                    ->columns(7)
+                    ->visible(fn (): bool => $this->selectedReportType()->usesThreshold()
+                        || $this->selectedReportType()->usesDateRange()),
             ])
-            ->columns(7)
             ->extraAttributes(['class' => 'gap-y-2']);
     }
 
@@ -421,6 +435,50 @@ class BankReportsPage extends Page implements HasActions, HasForms, HasTable
 
     protected function downloadPdf(): mixed
     {
+        $context = $this->resolveExportContext('لا توجد بيانات للطباعة');
+
+        if ($context === null) {
+            return null;
+        }
+
+        return PdfDownload::streamed(
+            app(InstallmentBankReportPdfService::class)->report(
+                $context['type'],
+                $context['rows'],
+                $context['payrollBank'],
+                $this->dateFrom,
+                $this->dateTo,
+            ),
+        );
+    }
+
+    protected function downloadExcel(): mixed
+    {
+        $context = $this->resolveExportContext();
+
+        if ($context === null) {
+            return null;
+        }
+
+        return app(InstallmentExcelService::class)->bankReport(
+            $context['rows'],
+            $context['type'],
+            $context['filterLines'],
+            $context['reportTitle'],
+        );
+    }
+
+    /**
+     * @return array{
+     *     rows: \Illuminate\Support\Collection,
+     *     type: BankReportType,
+     *     payrollBank: PayrollBank,
+     *     reportTitle: string,
+     *     filterLines: array<int, string>
+     * }|null
+     */
+    protected function resolveExportContext(string $emptyMessage = 'لا توجد بيانات للتصدير'): ?array
+    {
         $service = app(InstallmentBankReportService::class);
         $type = $this->selectedReportType();
         $payrollBank = $service->resolvePayrollBank(
@@ -474,7 +532,7 @@ class BankReportsPage extends Page implements HasActions, HasForms, HasTable
 
         if ($rows->isEmpty()) {
             Notification::make()
-                ->title('لا توجد بيانات للطباعة')
+                ->title($emptyMessage)
                 ->warning()
                 ->send();
 
@@ -492,15 +550,18 @@ class BankReportsPage extends Page implements HasActions, HasForms, HasTable
             ])->values();
         }
 
-        return PdfDownload::streamed(
-            app(InstallmentBankReportPdfService::class)->report(
+        return [
+            'rows' => $rows,
+            'type' => $type,
+            'payrollBank' => $payrollBank,
+            'reportTitle' => $type->pdfTitle($this->dateFrom, $this->dateTo),
+            'filterLines' => $service->filterLines(
                 $type,
-                $rows,
                 $payrollBank,
-                $this->dateFrom,
-                $this->dateTo,
+                $this->threshold,
+                $this->notPaidOnly,
             ),
-        );
+        ];
     }
 
     protected function selectedReportType(): BankReportType

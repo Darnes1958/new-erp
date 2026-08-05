@@ -5,6 +5,7 @@ namespace App\Filament\Ins\Pages;
 use App\Filament\Ins\Resources\InstallmentStopsWithoutContract\InstallmentStopWithoutContractResource;
 use App\Models\InstallmentStopWithoutContract;
 use App\Models\PayrollBank;
+use App\Filament\Ins\Support\InstallmentListPrintActions;
 use App\Filament\Ins\Support\InstallmentStopWithoutContractReportTitle;
 use App\Services\Installments\InstallmentStopWithoutContractReportService;
 use App\Services\Pdf\InstallmentStopWithoutContractPdfService;
@@ -49,7 +50,7 @@ class RecordInstallmentStopWithoutContract extends Page implements HasActions, H
 
     protected static string|\UnitEnum|null $navigationGroup = 'خصومات ومدفوعات';
 
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 6;
 
     protected string $view = 'filament.ins.pages.record-installment-stop-without-contract';
 
@@ -249,22 +250,12 @@ class RecordInstallmentStopWithoutContract extends Page implements HasActions, H
 
     public function printAction(): Action
     {
-        return Action::make('print')
-            ->label('طباعة')
-            ->button()
-            ->icon(Heroicon::OutlinedPrinter)
-            ->color('info')
-            ->action(fn () => $this->downloadCollectiveStopPdf());
+        return InstallmentListPrintActions::compactPrint('print', fn () => $this->downloadCollectiveStopPdf());
     }
 
     public function exportExcelAction(): Action
     {
-        return Action::make('exportExcel')
-            ->label('Excl')
-            ->button()
-            ->icon(Heroicon::OutlinedTableCells)
-            ->color('success')
-            ->action(fn () => $this->downloadExcelExport());
+        return InstallmentListPrintActions::compactExcel('exportExcel', fn () => $this->downloadExcelExport());
     }
 
     protected function afterActionCalled(Action $action): void

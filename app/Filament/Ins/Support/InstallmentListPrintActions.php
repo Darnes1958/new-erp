@@ -116,24 +116,34 @@ class InstallmentListPrintActions
         );
     }
 
-    protected static function pdfAction(string $name, callable $action): Action
+    public static function compactPrint(string $name, callable $action): Action
     {
         return Action::make($name)
-            ->label('PDF')
             ->icon('heroicon-o-printer')
+            ->iconButton()
             ->color('info')
+            ->tooltip('طباعة')
             ->size(Size::Small)
             ->action($action);
     }
 
-    protected static function excelAction(string $name, callable $action): Action
+    public static function compactExcel(string $name, callable $action): Action
     {
         return Action::make($name)
-            ->label('Excl')
-            ->icon('heroicon-o-table-cells')
+            ->label('EXCL')
             ->color('success')
             ->size(Size::Small)
             ->action($action);
+    }
+
+    protected static function pdfAction(string $name, callable $action): Action
+    {
+        return self::compactPrint($name, $action);
+    }
+
+    protected static function excelAction(string $name, callable $action): Action
+    {
+        return self::compactExcel($name, $action);
     }
 
     protected static function exportGroup(Action $pdf, Action $excel): ActionGroup

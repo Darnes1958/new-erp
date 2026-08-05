@@ -167,6 +167,34 @@ class InstallmentBankReportService
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function filterLines(
+        BankReportType $type,
+        PayrollBank $payrollBank,
+        float $threshold = 5,
+        bool $notPaidOnly = false,
+    ): array {
+        $lines = [
+            'للمصرف التجميعي : '.$payrollBank->name,
+        ];
+
+        if ($type === BankReportType::Paid) {
+            $lines[] = "الباقي : {$threshold}";
+        }
+
+        if ($type === BankReportType::Late) {
+            $lines[] = "عدد الأقساط المتأخرة : {$threshold}";
+
+            if ($notPaidOnly) {
+                $lines[] = 'لم تسدد بعد';
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
      * @return array{count: int, deducted_amount: float}
      */
     public function collectedSummary(

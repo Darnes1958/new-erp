@@ -11,6 +11,7 @@ use App\Filament\Market\Pages\ListSalesReturns;
 use App\Filament\Market\Pages\QuickSell\QuickSell;
 use App\Filament\Market\Support\MarketNavigationGroup;
 use App\Filament\Widgets\PanelSwitcherWidget;
+use App\Support\FilamentSidebarStyle;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
@@ -18,6 +19,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -84,6 +86,10 @@ class MarketPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 FilamentAuthenticate::class,
-            ]);
+            ])
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => FilamentSidebarStyle::headEndHtml(),
+            );
     }
 }

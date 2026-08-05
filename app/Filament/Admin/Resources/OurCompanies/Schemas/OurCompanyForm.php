@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\OurCompanies\Schemas;
 
 use App\Support\CompanyConnections;
+use App\Support\FilamentSidebarStyle;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
@@ -61,6 +62,67 @@ class OurCompanyForm
                     ->default(true)
                     ->visible(fn (): bool => (bool) Auth::user()?->is_prog),
             ])->columns(2),
+            Section::make('القائمة الجانبية')
+                ->description('تباعد عناصر القائمة الجانبية فقط.')
+                ->schema([
+                    TextInput::make('sidebar_group_gap_px')
+                        ->label('المسافة بين المجموعات (px)')
+                        ->numeric()
+                        ->minValue(0)
+                        ->maxValue(32)
+                        ->default(FilamentSidebarStyle::DEFAULT_GROUP_GAP_PX)
+                        ->helperText('الافتراضي: 8'),
+                    TextInput::make('sidebar_item_gap_px')
+                        ->label('المسافة بين عناصر القائمة (px)')
+                        ->numeric()
+                        ->minValue(0)
+                        ->maxValue(16)
+                        ->default(FilamentSidebarStyle::DEFAULT_ITEM_GAP_PX)
+                        ->helperText('الافتراضي: 2'),
+                    TextInput::make('sidebar_item_padding_y_px')
+                        ->label('ارتفاع عنصر القائمة (px)')
+                        ->numeric()
+                        ->minValue(2)
+                        ->maxValue(16)
+                        ->default(FilamentSidebarStyle::DEFAULT_ITEM_PADDING_Y_PX)
+                        ->helperText('الافتراضي: 4'),
+                ])
+                ->columns(3)
+                ->visible(fn (): bool => (bool) Auth::user()?->is_prog),
+            Section::make('الجداول')
+                ->description('تباعد وحجم خط الجداول في جميع الشاشات.')
+                ->schema([
+                    TextInput::make('table_cell_padding_y_px')
+                        ->label('ارتفاع صف الجدول (px)')
+                        ->numeric()
+                        ->minValue(1)
+                        ->maxValue(16)
+                        ->default(FilamentSidebarStyle::DEFAULT_TABLE_CELL_PADDING_Y_PX)
+                        ->helperText('الافتراضي: 5'),
+                    TextInput::make('table_header_padding_y_px')
+                        ->label('ارتفاع رأس الجدول (px)')
+                        ->numeric()
+                        ->minValue(1)
+                        ->maxValue(20)
+                        ->default(FilamentSidebarStyle::DEFAULT_TABLE_HEADER_PADDING_Y_PX)
+                        ->helperText('الافتراضي: 7'),
+                    TextInput::make('table_font_size_px')
+                        ->label('حجم خط السطر (px)')
+                        ->numeric()
+                        ->minValue(10)
+                        ->maxValue(18)
+                        ->default(FilamentSidebarStyle::DEFAULT_TABLE_FONT_SIZE_PX)
+                        ->helperText('الافتراضي: 13'),
+                    TextInput::make('table_header_font_size_px')
+                        ->label('حجم خط العنوان (px)')
+                        ->numeric()
+                        ->minValue(10)
+                        ->maxValue(18)
+                        ->default(FilamentSidebarStyle::DEFAULT_TABLE_HEADER_FONT_SIZE_PX)
+                        ->helperText('الافتراضي: 12'),
+                ])
+                ->columns(2)
+                ->visible(fn (): bool => (bool) Auth::user()?->is_prog),
         ]);
     }
 }

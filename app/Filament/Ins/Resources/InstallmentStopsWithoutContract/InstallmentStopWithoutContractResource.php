@@ -27,7 +27,7 @@ class InstallmentStopWithoutContractResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'خصومات ومدفوعات';
 
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 6;
 
     public static function shouldRegisterNavigation(): bool
     {

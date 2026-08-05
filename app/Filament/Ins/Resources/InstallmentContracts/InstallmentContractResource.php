@@ -20,7 +20,7 @@ class InstallmentContractResource extends Resource
 {
     protected static ?string $model = InstallmentContract::class;
 
-    protected static ?string $navigationLabel = 'عقود التقسيط';
+    protected static ?string $navigationLabel = 'عقود';
 
     protected static ?string $modelLabel = 'عقد تقسيط';
 
@@ -28,7 +28,7 @@ class InstallmentContractResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'عقود التقسيط';
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static ?int $navigationSort = 1;
 

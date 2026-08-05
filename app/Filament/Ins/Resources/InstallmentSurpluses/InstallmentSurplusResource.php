@@ -26,7 +26,7 @@ class InstallmentSurplusResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'خصومات ومدفوعات';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 3;
 
     public static function getNavigationBadge(): ?string
     {

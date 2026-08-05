@@ -21,6 +21,11 @@ class InstallmentReportsHub extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
+        return false;
+    }
+
+    public static function canAccess(): bool
+    {
         $user = Auth::user();
 
         return $user?->is_prog
@@ -28,11 +33,6 @@ class InstallmentReportsHub extends Page
             || $user?->can('تعديل عقود')
             || $user?->can('تقرير عن عقد')
             || $user?->can('تقرير عن مصرف');
-    }
-
-    public static function canAccess(): bool
-    {
-        return static::shouldRegisterNavigation();
     }
 
     /**
@@ -45,8 +45,9 @@ class InstallmentReportsHub extends Page
         return [
             [
                 'title' => 'تقرير عن عقد',
-                'description' => 'طباعة عقد تقسيط واحد مع تفاصيله.',
-                'status' => 'soon',
+                'description' => 'استعلام عن عقد تقسيط واحد مع خصوماته وطباعة نموذج المصرف.',
+                'url' => ContractReportPage::getUrl(),
+                'status' => 'ready',
             ],
             [
                 'title' => 'تقارير عن مصرف',

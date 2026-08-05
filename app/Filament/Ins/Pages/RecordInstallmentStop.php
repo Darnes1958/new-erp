@@ -2,9 +2,11 @@
 
 namespace App\Filament\Ins\Pages;
 
+use App\Filament\Ins\Support\InstallmentListPrintActions;
 use App\Models\InstallmentBank;
 use App\Models\InstallmentContract;
 use App\Models\PayrollBank;
+use App\Services\Excel\InstallmentExcelService;
 use App\Services\Installments\InstallmentStopReportService;
 use App\Services\Installments\InstallmentStopService;
 use App\Services\Pdf\InstallmentStopPdfService;
@@ -50,7 +52,7 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
 
     protected static string|\UnitEnum|null $navigationGroup = 'خصومات ومدفوعات';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 5;
 
     protected string $view = 'filament.ins.pages.record-installment-stop';
 
@@ -302,12 +304,12 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
 
     public function printAction(): Action
     {
-        return Action::make('print')
-            ->label('طباعة')
-            ->button()
-            ->icon(Heroicon::OutlinedPrinter)
-            ->color('info')
-            ->action(fn () => $this->downloadCollectiveStopPdf());
+        return InstallmentListPrintActions::compactPrint('print', fn () => $this->downloadCollectiveStopPdf());
+    }
+
+    public function exportExcelAction(): Action
+    {
+        return InstallmentListPrintActions::compactExcel('exportExcel', fn () => $this->downloadExcelExport());
     }
 
     protected function afterActionCalled(Action $action): void
@@ -357,6 +359,45 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
 
         return PdfDownload::streamed(
             app(InstallmentStopPdfService::class)->collectiveReport($rows, $payrollBank),
+        );
+    }
+
+    protected function downloadExcelExport(): mixed
+    {
+        $service = app(InstallmentStopReportService::class);
+        $payrollBank = $service->resolvePayrollBank(
+            $this->filterBy,
+            $this->installmentBankId,
+            $this->payrollBankId,
+        );
+
+        if (! $payrollBank) {
+            Notification::make()
+                ->title('اختر المصرف أولاً')
+                ->warning()
+                ->send();
+
+            return null;
+        }
+
+        $rows = $service->stoppedContractsQuery(
+            $this->filterBy,
+            $this->installmentBankId,
+            $this->payrollBankId,
+        )->get();
+
+        if ($rows->isEmpty()) {
+            Notification::make()
+                ->title('لا توجد بيانات للتصدير')
+                ->warning()
+                ->send();
+
+            return null;
+        }
+
+        return app(InstallmentExcelService::class)->installmentStopReport(
+            $rows,
+            $service->filterLines($payrollBank),
         );
     }
 

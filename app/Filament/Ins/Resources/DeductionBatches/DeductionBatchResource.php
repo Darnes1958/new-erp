@@ -24,7 +24,7 @@ class DeductionBatchResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-rectangle-stack';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'خصومات ومدفوعات';
+    protected static string|\UnitEnum|null $navigationGroup = 'أقساط';
 
     protected static ?int $navigationSort = 2;
 
