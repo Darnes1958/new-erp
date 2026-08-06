@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\InvoicePdfController;
+use App\Http\Controllers\WarehouseTransferPdfController;
 use App\Support\FilamentLogin;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Route;
@@ -22,4 +23,6 @@ Route::middleware('auth')->group(function (): void {
         ->name('pdf.sales-invoice');
     Route::get('/pdf/sales-offer-invoice/{salesOfferInvoice}', [InvoicePdfController::class, 'salesOffer'])
         ->name('pdf.sales-offer-invoice');
+    Route::get('/pdf/warehouse-transfer/{warehouseTransfer}', WarehouseTransferPdfController::class)
+        ->name('pdf.warehouse-transfer');
 });

@@ -24,12 +24,14 @@ class PanelSwitcherWidget extends Widget
                     'description' => match ($panel['id']) {
                         'market' => 'فواتير الشراء والبيع، الزبائن، المخازن',
                         'ins' => 'عقود الأقساط، الخصومات، الحافظات',
+                        'finance' => 'المصروفات، المرتبات، الإيجارات',
                         'admin' => 'المستخدمون وإعدادات الشركة',
                         default => '',
                     },
                     'color' => match ($panel['id']) {
                         'market' => 'amber',
                         'ins' => 'emerald',
+                        'finance' => 'violet',
                         'admin' => 'slate',
                         default => 'gray',
                     },

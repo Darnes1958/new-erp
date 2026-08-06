@@ -12,5 +12,7 @@ final class MarketNavigationGroup
 
     public const WarehousesItems = 'مخازن وأصناف';
 
+    public const DailyMovement = 'الحركة اليومية';
+
     public const ReceiptsAndPayments = 'ايصالات قبض ودفع';
 }

@@ -4,6 +4,7 @@ namespace App\Services\Conversion;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 class CompanyDataConverter
@@ -32,6 +33,7 @@ class CompanyDataConverter
             'fifo' => fn () => $this->convertFifo(),
             'payments' => fn () => $this->convertPayments(),
             'installments' => fn () => $this->convertInstallments(),
+            'finance' => fn () => $this->convertFinance(),
         ];
     }
 
@@ -87,6 +89,8 @@ class CompanyDataConverter
             'purchase_invoices', 'sales_invoice_lines', 'sales_returns', 'sales_invoices',
             'warehouse_stocks', 'item_prices', 'item_barcodes', 'items',
             'bank_accounts', 'cash_boxes', 'suppliers', 'customers',
+            'rent_transactions', 'rent_profiles', 'salary_transactions', 'salary_profiles',
+            'expenses', 'expense_types',
             'customer_types', 'warehouses', 'brands', 'item_types', 'units',
         ];
 
@@ -890,6 +894,109 @@ class CompanyDataConverter
                 DB::connection($this->target)->unprepared("SET IDENTITY_INSERT [{$table}] OFF");
             });
         }
+    }
+
+    protected function convertFinance(): void
+    {
+        $this->clearFinanceTarget();
+
+        $this->insertWithIdentity('expense_types', $this->sourceQuery('masr_types')->map(fn ($row) => [
+            'id' => (int) $row->id,
+            'name' => $row->name,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ])->all());
+
+        $this->insertWithIdentity('expenses', $this->sourceQuery('masrofats')->map(fn ($row) => [
+            'id' => (int) $row->id,
+            'expense_type_id' => (int) $row->masr_type_id,
+            'payment_method' => (int) ($row->pay_type ?? 1),
+            'bank_account_id' => $row->acc_id,
+            'cash_box_id' => $row->kazena_id,
+            'warehouse_id' => $row->place_id,
+            'expense_date' => $row->masr_date,
+            'amount' => $row->val ?? 0,
+            'notes' => $row->notes,
+            'created_by' => $row->user_id ?? null,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ])->all());
+
+        $this->insertWithIdentity('salary_profiles', $this->sourceQuery('salaries')->map(fn ($row) => [
+            'id' => (int) $row->id,
+            'name' => $row->name,
+            'salary_amount' => $row->sal ?? 0,
+            'warehouse_id' => $row->place_id,
+            'is_active' => (bool) ($row->status ?? true),
+            'balance' => $row->raseed ?? 0,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ])->all());
+
+        $this->insertWithIdentity('salary_transactions', $this->sourceQuery('salarytrans')->map(fn ($row) => [
+            'id' => (int) $row->id,
+            'salary_profile_id' => (int) $row->salary_id,
+            'transaction_date' => $row->tran_date,
+            'transaction_type' => $row->tran_type,
+            'amount' => $row->val ?? 0,
+            'period_month' => $row->month ?? '0',
+            'bank_account_id' => $row->acc_id,
+            'cash_box_id' => $row->kazena_id,
+            'notes' => $row->notes,
+            'created_by' => $row->user_id ?? null,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ])->all());
+
+        $this->insertWithIdentity('rent_profiles', $this->sourceQuery('rents')->map(fn ($row) => [
+            'id' => (int) $row->id,
+            'name' => $row->name,
+            'rent_amount' => $row->amount ?? 0,
+            'warehouse_id' => $row->place_id,
+            'is_active' => (bool) ($row->status ?? true),
+            'balance' => $row->raseed ?? 0,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ])->all());
+
+        $this->insertWithIdentity('rent_transactions', $this->sourceQuery('renttrans')->map(fn ($row) => [
+            'id' => (int) $row->id,
+            'rent_profile_id' => (int) $row->rent_id,
+            'transaction_date' => $row->tran_date,
+            'transaction_type' => $row->tran_type,
+            'amount' => $row->val ?? 0,
+            'period_month' => $row->month ?? '0',
+            'bank_account_id' => $row->acc_id,
+            'cash_box_id' => $row->kazena_id,
+            'notes' => $row->notes,
+            'created_by' => $row->user_id ?? null,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ])->all());
+    }
+
+    protected function clearFinanceTarget(): void
+    {
+        $this->log('Clearing finance tables on target...');
+
+        $tables = [
+            'rent_transactions',
+            'salary_transactions',
+            'expenses',
+            'rent_profiles',
+            'salary_profiles',
+            'expense_types',
+        ];
+
+        DB::connection($this->target)->statement('EXEC sp_MSforeachtable "ALTER TABLE ? NOCHECK CONSTRAINT ALL"');
+
+        foreach ($tables as $table) {
+            if (Schema::connection($this->target)->hasTable($table)) {
+                DB::connection($this->target)->table($table)->delete();
+            }
+        }
+
+        DB::connection($this->target)->statement('EXEC sp_MSforeachtable "ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL"');
     }
 
     protected function log(string $message): void

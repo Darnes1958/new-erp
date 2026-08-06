@@ -7,6 +7,7 @@ use App\Http\Middleware\FilamentAuthenticateSession;
 use App\Filament\Market\Pages\InpBuy\InpBuy;
 use App\Filament\Market\Pages\InpSell\InpSell;
 use App\Filament\Market\Pages\InpSellOffer\InpSellOffer;
+use App\Filament\Market\Pages\InpWarehouseTransfer\InpWarehouseTransfer;
 use App\Filament\Market\Pages\ListSalesReturns;
 use App\Filament\Market\Pages\QuickSell\QuickSell;
 use App\Filament\Market\Support\MarketNavigationGroup;
@@ -58,6 +59,7 @@ class MarketPanelProvider extends PanelProvider
                 QuickSell::class,
                 InpSellOffer::class,
                 ListSalesReturns::class,
+                InpWarehouseTransfer::class,
             ])
             ->discoverWidgets(
                 in: app_path('Filament/Market/Widgets'),
@@ -71,6 +73,7 @@ class MarketPanelProvider extends PanelProvider
                 NavigationGroup::make(MarketNavigationGroup::SalesInvoices),
                 NavigationGroup::make(MarketNavigationGroup::CustomersSuppliers),
                 NavigationGroup::make(MarketNavigationGroup::WarehousesItems),
+                NavigationGroup::make(MarketNavigationGroup::DailyMovement),
                 NavigationGroup::make(MarketNavigationGroup::ReceiptsAndPayments),
             ])
             ->middleware([
@@ -89,7 +92,17 @@ class MarketPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => FilamentSidebarStyle::headEndHtml(),
+                fn (): string => FilamentSidebarStyle::headEndHtml().<<<'HTML'
+                    <style>
+                        .market-compact-exports {
+                            display: flex;
+                            flex-wrap: nowrap;
+                            align-items: center;
+                            gap: 0.25rem;
+                            direction: ltr;
+                        }
+                    </style>
+                    HTML,
             );
     }
 }

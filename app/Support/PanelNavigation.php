@@ -31,6 +31,12 @@ class PanelNavigation
                 'icon' => Heroicon::OutlinedBanknotes,
             ],
             [
+                'id' => 'finance',
+                'label' => 'مالية',
+                'color' => 'violet',
+                'icon' => Heroicon::OutlinedCurrencyDollar,
+            ],
+            [
                 'id' => 'admin',
                 'label' => 'إدارة',
                 'color' => 'warning',
