@@ -2,6 +2,7 @@
 
 namespace App\Services\Conversion;
 
+use App\Support\Conversion\LegacyConnectionNaming;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
@@ -16,23 +17,64 @@ class AuthDataConverter
         $this->source = $source;
     }
 
-    public function convert(bool $fresh = false, ?string $company = null): void
+    /**
+     * Full auth import (all companies). Use once on a fresh central DB.
+     */
+    public function convert(bool $fresh = false, ?string $company = null, ?string $targetCompany = null): void
     {
         $this->assertConnections();
+
+        if ($company !== null) {
+            $this->convertCompanyUsers(
+                $company,
+                $targetCompany ?? LegacyConnectionNaming::targetName($company),
+                $fresh,
+            );
+
+            return;
+        }
 
         if ($fresh) {
             $this->clearTarget();
         }
 
-        $this->convertRoles();
-        $this->convertPermissions();
-        $this->convertRolePermissions();
-        $userIds = $this->convertUsers($company);
+        $this->syncRoles();
+        $this->syncPermissions();
+        $this->syncRolePermissions();
+        $userIds = $this->insertAllUsers();
 
-        $this->convertModelRoles($userIds);
-        $this->convertModelPermissions($userIds);
+        $this->syncModelRoles($userIds);
+        $this->syncModelPermissions($userIds);
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * Import / refresh users for one legacy company (Electro → Electro_erp).
+     * Safe to run per company; does not wipe other companies' users.
+     */
+    public function convertCompanyUsers(string $legacyCompany, string $targetCompany, bool $replaceCompanyUsers = false): void
+    {
+        $this->assertConnections();
+
+        $this->log("Converting users for [{$legacyCompany}] → [{$targetCompany}]");
+
+        $this->syncRoles();
+        $this->syncPermissions();
+        $this->syncRolePermissions();
+
+        if ($replaceCompanyUsers) {
+            DB::table('users')->where('company', $targetCompany)->delete();
+        }
+
+        $userIds = $this->upsertCompanyUsers($legacyCompany, $targetCompany);
+
+        $this->syncModelRoles($userIds);
+        $this->syncModelPermissions($userIds);
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->log('Imported '.count($userIds)." user(s) for [{$legacyCompany}] → [{$targetCompany}].");
     }
 
     protected function assertConnections(): void
@@ -58,10 +100,8 @@ class AuthDataConverter
         DB::table('users')->delete();
     }
 
-    protected function convertRoles(): void
+    protected function syncRoles(): void
     {
-        $this->log('Converting roles...');
-
         $rows = DB::connection($this->source)
             ->table('roles')
             ->orderBy('id')
@@ -76,13 +116,11 @@ class AuthDataConverter
             ])
             ->all();
 
-        $this->insertWithIdentity('roles', $rows);
+        $this->insertMissingWithIdentity('roles', $rows);
     }
 
-    protected function convertPermissions(): void
+    protected function syncPermissions(): void
     {
-        $this->log('Converting permissions...');
-
         $rows = DB::connection($this->source)
             ->table('permissions')
             ->orderBy('id')
@@ -97,102 +135,228 @@ class AuthDataConverter
             ])
             ->all();
 
-        $this->insertWithIdentity('permissions', $rows);
+        $this->insertMissingWithIdentity('permissions', $rows);
     }
 
-    protected function convertRolePermissions(): void
+    protected function syncRolePermissions(): void
     {
-        $this->log('Converting role permissions...');
-
-        $rows = DB::connection($this->source)
-            ->table('role_has_permissions')
-            ->get()
-            ->map(fn ($row) => [
+        foreach (DB::connection($this->source)->table('role_has_permissions')->get() as $row) {
+            $payload = [
                 'permission_id' => (int) $row->permission_id,
                 'role_id' => (int) $row->role_id,
-            ])
-            ->all();
+            ];
 
-        foreach ($rows as $row) {
-            DB::table('role_has_permissions')->insert($row);
+            $exists = DB::table('role_has_permissions')
+                ->where('permission_id', $payload['permission_id'])
+                ->where('role_id', $payload['role_id'])
+                ->exists();
+
+            if (! $exists) {
+                DB::table('role_has_permissions')->insert($payload);
+            }
         }
     }
 
     /** @return list<int> */
-    protected function convertUsers(?string $company): array
+    protected function insertAllUsers(): array
     {
         $this->log('Converting users...');
 
-        $query = DB::connection($this->source)->table('users')->orderBy('id');
-
-        if ($company) {
-            $query->where('company', $company);
-        }
-
-        $rows = $query->get()->map(fn ($row) => [
-            'id' => (int) $row->id,
-            'name' => $row->name,
-            'email' => $row->email,
-            'email_verified_at' => $row->email_verified_at,
-            'password' => $row->password,
-            'company' => $row->company,
-            'warehouse_id' => $row->place_id,
-            'status' => $row->status ?? 1,
-            'remember_token' => $row->remember_token,
-            'is_prog' => (bool) ($row->is_prog ?? false),
-            'created_at' => $row->created_at,
-            'updated_at' => $row->updated_at,
-        ])->all();
+        $rows = DB::connection($this->source)
+            ->table('users')
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($row) => $this->legacyUserRowToPayload($row, (string) $row->company))
+            ->all();
 
         $this->insertWithIdentity('users', $rows);
 
         return array_column($rows, 'id');
     }
 
-    /** @param list<int> $userIds */
-    protected function convertModelRoles(array $userIds): void
+    /** @return list<int> */
+    protected function upsertCompanyUsers(string $legacyCompany, string $targetCompany): array
     {
+        $legacyUsers = DB::connection($this->source)
+            ->table('users')
+            ->where('company', $legacyCompany)
+            ->orderBy('id')
+            ->get();
+
+        if ($legacyUsers->isEmpty()) {
+            $this->log("No users found for company [{$legacyCompany}] on [{$this->source}].");
+
+            return [];
+        }
+
+        $userIds = [];
+
+        foreach ($legacyUsers as $row) {
+            $id = (int) $row->id;
+            $payload = $this->legacyUserRowToPayload($row, $targetCompany);
+            unset($payload['id']);
+
+            $existingById = DB::table('users')->where('id', $id)->exists();
+            $existingByEmail = filled($row->email)
+                && DB::table('users')->where('email', $row->email)->exists();
+
+            if ($existingById) {
+                DB::table('users')->where('id', $id)->update($payload);
+                $userIds[] = $id;
+
+                continue;
+            }
+
+            if ($existingByEmail) {
+                $this->log("Skipped user id {$id}: email [{$row->email}] already exists.");
+
+                continue;
+            }
+
+            DB::transaction(function () use ($id, $payload): void {
+                DB::unprepared('SET IDENTITY_INSERT [users] ON');
+                DB::table('users')->insert(['id' => $id, ...$payload]);
+                DB::unprepared('SET IDENTITY_INSERT [users] OFF');
+            });
+
+            $userIds[] = $id;
+        }
+
+        return $userIds;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function legacyUserRowToPayload(object $row, string $company): array
+    {
+        return [
+            'id' => (int) $row->id,
+            'name' => $row->name,
+            'email' => $row->email,
+            'email_verified_at' => $row->email_verified_at,
+            'password' => $row->password,
+            'company' => $company,
+            'warehouse_id' => $row->place_id ?? null,
+            'status' => $row->status ?? 1,
+            'remember_token' => $row->remember_token,
+            'is_prog' => (bool) ($row->is_prog ?? false),
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ];
+    }
+
+    /** @param list<int> $userIds */
+    protected function syncModelRoles(array $userIds): void
+    {
+        if ($userIds === []) {
+            return;
+        }
+
         $this->log('Converting user roles...');
 
-        $query = DB::connection($this->source)
-            ->table('model_has_roles')
-            ->where('model_type', 'App\Models\User');
+        $existingRoles = array_fill_keys(
+            DB::table('roles')->pluck('id')->all(),
+            true,
+        );
 
-        if ($userIds !== []) {
-            $query->whereIn('model_id', $userIds);
-        }
+        foreach (
+            DB::connection($this->source)
+                ->table('model_has_roles')
+                ->where('model_type', 'App\Models\User')
+                ->whereIn('model_id', $userIds)
+                ->get() as $row
+        ) {
+            $roleId = (int) $row->role_id;
+            $modelId = (int) $row->model_id;
 
-        foreach ($query->get() as $row) {
+            if (! isset($existingRoles[$roleId])) {
+                continue;
+            }
+
+            $exists = DB::table('model_has_roles')
+                ->where('role_id', $roleId)
+                ->where('model_type', 'App\\Models\\User')
+                ->where('model_id', $modelId)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
             DB::table('model_has_roles')->insert([
-                'role_id' => (int) $row->role_id,
+                'role_id' => $roleId,
                 'model_type' => 'App\\Models\\User',
-                'model_id' => (int) $row->model_id,
+                'model_id' => $modelId,
             ]);
         }
     }
 
     /** @param list<int> $userIds */
-    protected function convertModelPermissions(array $userIds): void
+    protected function syncModelPermissions(array $userIds): void
     {
-        $this->log('Converting user permissions...');
-
-        $query = DB::connection($this->source)
-            ->table('model_has_permissions')
-            ->where('model_type', 'App\Models\User');
-
-        if ($userIds !== []) {
-            $query->whereIn('model_id', $userIds);
+        if ($userIds === []) {
+            return;
         }
 
-        foreach ($query->get() as $row) {
+        $this->log('Converting user permissions...');
+
+        $existingPermissions = array_fill_keys(
+            DB::table('permissions')->pluck('id')->all(),
+            true,
+        );
+
+        foreach (
+            DB::connection($this->source)
+                ->table('model_has_permissions')
+                ->where('model_type', 'App\Models\User')
+                ->whereIn('model_id', $userIds)
+                ->get() as $row
+        ) {
+            $permissionId = (int) $row->permission_id;
+            $modelId = (int) $row->model_id;
+
+            if (! isset($existingPermissions[$permissionId])) {
+                continue;
+            }
+
+            $exists = DB::table('model_has_permissions')
+                ->where('permission_id', $permissionId)
+                ->where('model_type', 'App\\Models\\User')
+                ->where('model_id', $modelId)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
             DB::table('model_has_permissions')->insert([
-                'permission_id' => (int) $row->permission_id,
+                'permission_id' => $permissionId,
                 'model_type' => 'App\\Models\\User',
-                'model_id' => (int) $row->model_id,
+                'model_id' => $modelId,
             ]);
         }
     }
 
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    protected function insertMissingWithIdentity(string $table, array $rows): void
+    {
+        $missing = [];
+
+        foreach ($rows as $row) {
+            if (! DB::table($table)->where('id', $row['id'])->exists()) {
+                $missing[] = $row;
+            }
+        }
+
+        $this->insertWithIdentity($table, $missing);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
     protected function insertWithIdentity(string $table, array $rows): void
     {
         if ($rows === []) {

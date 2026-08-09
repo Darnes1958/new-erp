@@ -24,6 +24,7 @@ class CompanyDataConverter
         $this->target = $target;
 
         $this->steps = [
+            'users' => fn () => $this->convertUsers(),
             'company_settings' => fn () => $this->convertCompanySettings(),
             'payment_methods' => fn () => $this->convertPaymentMethods(),
             'master' => fn () => $this->convertMasterData(),
@@ -112,6 +113,13 @@ class CompanyDataConverter
     protected function reseedPaymentMethods(): void
     {
         DB::connection($this->target)->table('payment_methods')->delete();
+    }
+
+    protected function convertUsers(): void
+    {
+        $legacyAuth = config('erp.legacy_auth_connection', 'InsFila');
+
+        (new AuthDataConverter($legacyAuth))->convertCompanyUsers($this->source, $this->target);
     }
 
     protected function convertCompanySettings(): void

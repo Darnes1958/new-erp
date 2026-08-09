@@ -11,7 +11,7 @@ class ErpConvertCommand extends Command
         {source=Motafoek : Old company database connection}
         {target=testERP : New company database connection}
         {--fresh : Clear target data before converting}
-        {--only= : Comma-separated steps: company_settings,payment_methods,master,items,purchases,sales,fifo,payments,installments,finance,excel_settings,operation_logs}';
+        {--only= : Comma-separated steps: users,company_settings,payment_methods,master,items,purchases,sales,fifo,payments,installments,finance,excel_settings,operation_logs}';
 
     protected $description = 'Convert company data from old ERP schema to new ERP schema';
 
