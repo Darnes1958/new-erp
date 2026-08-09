@@ -337,9 +337,7 @@ class CompanyDataConverter
     protected function convertPurchases(): void
     {
         $buyLinesByReturn = $this->sourceQuery('buy_trans')
-            ->whereNotNull('tar_buy_id')
-            ->where('tar_buy_id', '!=', 0)
-            ->get()
+            ->filter(fn ($row) => filled($row->tar_buy_id ?? null) && (int) $row->tar_buy_id !== 0)
             ->keyBy('tar_buy_id');
 
         $this->insertWithIdentity('purchase_returns', $this->sourceQuery('tar_buys')->map(function ($row) use ($buyLinesByReturn) {
@@ -399,9 +397,7 @@ class CompanyDataConverter
     protected function convertSales(): void
     {
         $sellLinesByReturn = $this->sourceQuery('sell_trans')
-            ->whereNotNull('tar_sell_id')
-            ->where('tar_sell_id', '!=', 0)
-            ->get()
+            ->filter(fn ($row) => filled($row->tar_sell_id ?? null) && (int) $row->tar_sell_id !== 0)
             ->keyBy('tar_sell_id');
 
         $this->insertWithIdentity('sales_returns', $this->sourceQuery('tar_sells')->map(function ($row) use ($sellLinesByReturn) {
