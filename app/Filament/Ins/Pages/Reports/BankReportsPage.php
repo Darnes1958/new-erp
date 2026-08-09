@@ -86,7 +86,7 @@ class BankReportsPage extends Page implements HasActions, HasForms, HasTable
     public function mount(): void
     {
         $this->payrollBankId = PayrollBank::query()->min('id');
-        $this->dateFrom = now()->toDateString();
+        $this->dateFrom = now()->startOfYear()->toDateString();
         $this->dateTo = now()->toDateString();
 
         $this->filtersForm->fill([

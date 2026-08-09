@@ -41,8 +41,7 @@ class ItemQuickForm
                         ->unique(ignoreRecord: $forEdit, table: Item::class)
                         ->validationMessages([
                             'unique' => ':attribute مخزون مسبقاً',
-                        ])
-                        ->columnSpan(2),
+                        ]),
                     TextInput::make('barcode')
                         ->label('الباركود')
                         ->required()
@@ -67,7 +66,18 @@ class ItemQuickForm
                         ->searchable()
                         ->preload()
                         ->required()
-                        ->columnSpan(2)
+                        ->createOptionForm([
+                            TextInput::make('name')
+                                ->label('الاسم')
+                                ->required()
+                                ->unique(),
+                        ]),
+                    Select::make('item_type_id')
+                        ->label('التصنيف')
+                        ->relationship('itemType', 'name')
+                        ->searchable()
+                        ->preload()
+                        ->required()
                         ->createOptionForm([
                             TextInput::make('name')
                                 ->label('الاسم')
@@ -88,25 +98,11 @@ class ItemQuickForm
                     TextInput::make('sell_price_installment')
                         ->label('سعر البيع تقسيطاً')
                         ->numeric(),
-                    Select::make('item_type_id')
-                        ->label('التصنيف')
-                        ->relationship('itemType', 'name')
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        ->columnSpan(2)
-                        ->createOptionForm([
-                            TextInput::make('name')
-                                ->label('الاسم')
-                                ->required()
-                                ->unique(),
-                        ]),
                     Select::make('brand_id')
                         ->label('الشركة المصنعة')
                         ->relationship('brand', 'name')
                         ->searchable()
                         ->preload()
-                        ->columnSpan(2)
                         ->createOptionForm([
                             TextInput::make('name')
                                 ->label('الاسم')

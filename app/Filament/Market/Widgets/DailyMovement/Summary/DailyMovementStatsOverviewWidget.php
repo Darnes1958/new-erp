@@ -11,6 +11,8 @@ class DailyMovementStatsOverviewWidget extends StatsOverviewWidget
 {
     use InteractsWithDailyMovementFilters;
 
+    protected static bool $isDiscovered = false;
+
     protected static bool $isLazy = false;
 
     protected int | string | array $columnSpan = 'full';

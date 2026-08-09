@@ -10,7 +10,9 @@ use App\Models\InstallmentDeduction;
 use App\Models\InstallmentSurplus;
 use App\Models\InstallmentSuspended;
 use App\Models\SalesInvoice;
-use App\Services\Installments\InstallmentContractMetricsService;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationContext;
+use App\Support\SystemOperationType;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -257,7 +259,54 @@ class InstallmentContractService
         $contract->fill($attributes);
         $contract->save();
 
+        SystemOperationLogger::updated(
+            SystemOperationType::INSTALLMENT_CONTRACT,
+            $contract->id,
+            SystemOperationContext::fromContract($contract),
+        );
+
         return $contract->refresh();
+    }
+
+    /**
+     * Validates sales invoice edit when linked to an active installment contract.
+     */
+    public function validateSalesInvoiceUpdate(SalesInvoice $invoice, float $grandTotal, float $balance): ?string
+    {
+        $contract = $invoice->installmentContract;
+
+        if (! $contract) {
+            return null;
+        }
+
+        $totalPaid = (float) $contract->total_paid;
+
+        if ($grandTotal + 0.0001 < $totalPaid || $balance + 0.0001 < $totalPaid) {
+            return 'يجب أن لا يكون اجمالي الفاتورة أصغر من المدفوع في العقد';
+        }
+
+        return null;
+    }
+
+    /**
+     * Sync contract totals after the linked sales invoice is saved.
+     */
+    public function syncFromSalesInvoice(SalesInvoice $invoice): void
+    {
+        $contract = $invoice->installmentContract;
+
+        if (! $contract) {
+            return;
+        }
+
+        $invoice->loadMissing('customer');
+
+        $contract->forceFill([
+            'customer_id' => $invoice->customer_id,
+            'contract_total' => (float) $invoice->balance,
+        ])->saveQuietly();
+
+        $this->metrics->recalculate($contract->refresh());
     }
 
     public function updateStandalone(InstallmentContract $contract, array $data): InstallmentContract
@@ -310,6 +359,12 @@ class InstallmentContractService
         $contract->fill($attributes);
         $contract->save();
 
+        SystemOperationLogger::updated(
+            SystemOperationType::INSTALLMENT_CONTRACT,
+            $contract->id,
+            SystemOperationContext::fromContract($contract),
+        );
+
         return $contract->refresh();
     }
 
@@ -320,6 +375,9 @@ class InstallmentContractService
 
     public function cancel(InstallmentContract $contract): void
     {
+        $contractId = $contract->id;
+        $context = SystemOperationContext::fromContract($contract);
+
         DB::connection($contract->getConnectionName())->transaction(function () use ($contract): void {
             InstallmentDeduction::query()
                 ->where('installment_contract_id', $contract->id)
@@ -340,6 +398,8 @@ class InstallmentContractService
 
             $contract->delete();
         });
+
+        SystemOperationLogger::cancelled(SystemOperationType::INSTALLMENT_CONTRACT, $contractId, $context);
     }
 
     protected function assertContractIdAvailable(int $contractId, int|string $currentId): void

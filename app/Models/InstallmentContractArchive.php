@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class InstallmentContractArchive extends CompanyModel
@@ -53,6 +54,11 @@ class InstallmentContractArchive extends CompanyModel
     public function salesInvoice(): BelongsTo
     {
         return $this->belongsTo(SalesInvoice::class);
+    }
+
+    public function deductions(): HasMany
+    {
+        return $this->hasMany(InstallmentDeductionArchive::class, 'installment_contract_id');
     }
 
     public function surpluses(): MorphMany

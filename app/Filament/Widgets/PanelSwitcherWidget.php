@@ -7,7 +7,7 @@ use Filament\Widgets\Widget;
 
 class PanelSwitcherWidget extends Widget
 {
-    protected static ?int $sort = -2;
+    protected static ?int $sort = 4;
 
     protected int|string|array $columnSpan = 'full';
 
@@ -25,7 +25,7 @@ class PanelSwitcherWidget extends Widget
                         'market' => 'فواتير الشراء والبيع، الزبائن، المخازن',
                         'ins' => 'عقود الأقساط، الخصومات، الحافظات',
                         'finance' => 'المصروفات، المرتبات، الإيجارات',
-                        'admin' => 'المستخدمون وإعدادات الشركة',
+                        'admin' => 'المستخدمون، الأرباح، إعدادات الشركة',
                         default => '',
                     },
                     'color' => match ($panel['id']) {
@@ -35,6 +35,7 @@ class PanelSwitcherWidget extends Widget
                         'admin' => 'slate',
                         default => 'gray',
                     },
+                    'icon' => $panel['icon'],
                 ])
                 ->all(),
         ];

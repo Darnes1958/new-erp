@@ -98,7 +98,10 @@ class InstallmentSurplusesTable
                                 $data['date_to'] ?? null,
                                 fn (Builder $query, $date): Builder => $query->whereDate('surplus_date', '<=', $date),
                             );
-                    }),
+                    })
+                    ->default([
+                        'date_from' => now()->startOfYear()->toDateString(),
+                    ]),
             ])
             ->recordUrl(null)
             ->checkIfRecordIsSelectableUsing(

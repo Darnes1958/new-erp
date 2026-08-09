@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Users\Schemas;
 
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -30,6 +31,14 @@ class UserForm
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
+                FileUpload::make('avatar_path')
+                    ->label('صورة المستخدم')
+                    ->image()
+                    ->disk('public')
+                    ->directory('user-avatars')
+                    ->visibility('public')
+                    ->avatar()
+                    ->columnSpanFull(),
                 TextInput::make('password')
                     ->label('كلمة المرور')
                     ->password()

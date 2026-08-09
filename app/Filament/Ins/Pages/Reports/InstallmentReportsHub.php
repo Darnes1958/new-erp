@@ -2,6 +2,7 @@
 
 namespace App\Filament\Ins\Pages\Reports;
 
+use App\Filament\Ins\Resources\InstallmentContractArchives\InstallmentContractArchiveResource;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
@@ -47,6 +48,24 @@ class InstallmentReportsHub extends Page
                 'title' => 'تقرير عن عقد',
                 'description' => 'استعلام عن عقد تقسيط واحد مع خصوماته وطباعة نموذج المصرف.',
                 'url' => ContractReportPage::getUrl(),
+                'status' => 'ready',
+            ],
+            [
+                'title' => 'استعلام عن عقد من الأرشيف',
+                'description' => 'بحث برقم العقد في الأرشيف مع الخصومات واسترجاع العقد.',
+                'url' => ArchiveContractReportPage::getUrl(),
+                'status' => 'ready',
+            ],
+            [
+                'title' => 'تقرير عقود الزبون',
+                'description' => 'عرض عقود زبون واحد: قائمة، أرشيف، ملغاة، أو الكل.',
+                'url' => CustomerContractsReportPage::getUrl(),
+                'status' => 'ready',
+            ],
+            [
+                'title' => 'الأرشيف',
+                'description' => 'تصفح العقود المؤرشفة واسترجاعها.',
+                'url' => InstallmentContractArchiveResource::getUrl(),
                 'status' => 'ready',
             ],
             [

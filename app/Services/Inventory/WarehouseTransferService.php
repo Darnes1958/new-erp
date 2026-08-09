@@ -10,6 +10,8 @@ use App\Models\WarehouseStock;
 use App\Models\WarehouseTransfer;
 use App\Models\WarehouseTransferLayer;
 use App\Models\WarehouseTransferLine;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationType;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +96,8 @@ class WarehouseTransferService
     public function reverse(WarehouseTransfer $transfer): void
     {
         $transfer->load(['lines.layers', 'warehouseFrom', 'warehouseTo']);
+        $transferId = (int) $transfer->id;
+        $lines = $transfer->lines;
 
         DB::transaction(function () use ($transfer): void {
             $salesInventory = app(SalesInventoryService::class);
@@ -162,6 +166,14 @@ class WarehouseTransferService
 
             $transfer->delete();
         });
+
+        foreach ($lines as $line) {
+            SystemOperationLogger::cancelled(
+                SystemOperationType::WAREHOUSE_TRANSFER,
+                $transferId,
+                SystemOperationContext::item((int) $line->item_id),
+            );
+        }
     }
 
     private function applyLine(

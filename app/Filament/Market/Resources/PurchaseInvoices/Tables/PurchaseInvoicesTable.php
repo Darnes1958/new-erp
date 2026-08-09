@@ -5,13 +5,16 @@ namespace App\Filament\Market\Resources\PurchaseInvoices\Tables;
 use App\Filament\Market\Resources\PurchaseInvoices\Pages\EditBuy;
 use App\Filament\Market\Resources\PurchaseInvoices\Pages\PurchaseReturnEntry;
 use App\Models\PurchaseInvoice;
+use App\Services\Inventory\PurchaseInvoiceCancelService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Support\Enums\IconSize;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -93,6 +96,14 @@ class PurchaseInvoicesTable
                     ->iconButton()
                     ->url(fn (Model $record): string => route('pdf.purchase-invoice', ['purchaseInvoice' => $record]))
                     ->openUrlInNewTab(),
+                Action::make('print_item_prices')
+                    ->tooltip('طباعة اسعار الأصناف')
+                    ->icon('heroicon-s-printer')
+                    ->iconButton()
+                    ->iconSize(IconSize::Small)
+                    ->color('primary')
+                    ->url(fn (Model $record): string => route('pdf.purchase-invoice-item-prices', ['purchaseInvoice' => $record]))
+                    ->openUrlInNewTab(),
                 Action::make('edit_buy')
                     ->label('تعديل')
                     ->icon('heroicon-m-pencil')
@@ -106,7 +117,22 @@ class PurchaseInvoicesTable
                     ->color('primary')
                     ->tooltip('ترجيع')
                     ->url(fn (Model $record): string => PurchaseReturnEntry::getUrl(['record' => $record])),
-                DeleteAction::make()->iconButton(),
+                DeleteAction::make()
+                    ->iconButton()
+                    ->visible(fn (PurchaseInvoice $record): bool => $record->canBeDeleted())
+                    ->before(function (PurchaseInvoice $record): void {
+                        try {
+                            $record->assertCanBeDeleted();
+                        } catch (\RuntimeException $exception) {
+                            Notification::make()
+                                ->title($exception->getMessage())
+                                ->warning()
+                                ->send();
+
+                            throw $exception;
+                        }
+                    })
+                    ->using(fn (PurchaseInvoice $record) => app(PurchaseInvoiceCancelService::class)->cancel($record)),
             ]);
     }
 }

@@ -4,7 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Http\Middleware\FilamentAuthenticate;
 use App\Http\Middleware\FilamentAuthenticateSession;
-use App\Filament\Widgets\PanelSwitcherWidget;
+use App\Support\DashboardWidgets;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
@@ -50,9 +50,7 @@ class InsPanelProvider extends PanelProvider
                 in: app_path('Filament/Ins/Widgets'),
                 for: 'App\\Filament\\Ins\\Widgets',
             )
-            ->widgets([
-                PanelSwitcherWidget::class,
-            ])
+            ->widgets(DashboardWidgets::forPanel())
             ->navigationGroups([
                 NavigationGroup::make('أقساط'),
                 NavigationGroup::make('خصومات ومدفوعات'),

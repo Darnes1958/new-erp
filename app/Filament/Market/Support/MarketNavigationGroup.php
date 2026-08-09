@@ -15,4 +15,6 @@ final class MarketNavigationGroup
     public const DailyMovement = 'الحركة اليومية';
 
     public const ReceiptsAndPayments = 'ايصالات قبض ودفع';
+
+    public const BanksAndCashBoxes = 'مصارف وخزائن';
 }

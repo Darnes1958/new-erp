@@ -8,6 +8,9 @@ use App\Models\InstallmentContract;
 use App\Models\InstallmentContractArchive;
 use App\Models\InstallmentDeduction;
 use App\Models\InstallmentSurplus;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationContext;
+use App\Support\SystemOperationType;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -158,6 +161,16 @@ class InstallmentDeductionService
                 'remaining_balance' => $surplus->amount,
             ])->saveQuietly();
         });
+
+        SystemOperationLogger::updated(
+            SystemOperationType::INSTALLMENT_DEDUCTION,
+            $deduction->installment_contract_id,
+            SystemOperationContext::customer(
+                InstallmentContract::query()
+                    ->whereKey($deduction->installment_contract_id)
+                    ->value('customer_id'),
+            ),
+        );
     }
 
     public function delete(InstallmentDeduction $deduction): void
@@ -170,6 +183,9 @@ class InstallmentDeductionService
 
         $contractId = $deduction->installment_contract_id;
         $connection = $deduction->getConnectionName();
+        $context = SystemOperationContext::customer(
+            InstallmentContract::on($connection)->whereKey($contractId)->value('customer_id'),
+        );
 
         DB::connection($connection)->transaction(function () use ($deduction, $contractId, $connection): void {
             $deduction->delete();
@@ -180,6 +196,8 @@ class InstallmentDeductionService
                 $this->reorderSequences($contract);
             }
         });
+
+        SystemOperationLogger::cancelled(SystemOperationType::INSTALLMENT_DEDUCTION, $contractId, $context);
     }
 
     public function reorderSequences(InstallmentContract $contract): void

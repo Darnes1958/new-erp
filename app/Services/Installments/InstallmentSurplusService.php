@@ -6,6 +6,9 @@ use App\Enums\InstallmentRecordStatus;
 use App\Models\InstallmentContract;
 use App\Models\InstallmentContractArchive;
 use App\Models\InstallmentSurplus;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationContext;
+use App\Support\SystemOperationType;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -60,6 +63,12 @@ class InstallmentSurplusService
             'amount' => $amount,
         ]);
 
+        SystemOperationLogger::updated(
+            SystemOperationType::INSTALLMENT_SURPLUS,
+            $surplus->id,
+            SystemOperationContext::fromSurplus($surplus),
+        );
+
         return $surplus->refresh();
     }
 
@@ -71,7 +80,12 @@ class InstallmentSurplusService
             ]);
         }
 
+        $surplusId = $surplus->id;
+        $context = SystemOperationContext::fromSurplus($surplus);
+
         $surplus->delete();
+
+        SystemOperationLogger::cancelled(SystemOperationType::INSTALLMENT_SURPLUS, $surplusId, $context);
     }
 
     /**

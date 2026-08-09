@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class CashBox extends CompanyModel
 {
     protected $fillable = [
@@ -16,5 +18,10 @@ class CashBox extends CompanyModel
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    public function assignedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_user_id');
     }
 }

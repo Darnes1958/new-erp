@@ -40,6 +40,10 @@ class SalesInvoice extends CompanyModel
 
     protected static function booted(): void
     {
+        static::deleting(function (SalesInvoice $invoice): void {
+            $invoice->assertCanBeDeleted();
+        });
+
         static::saved(function (SalesInvoice $invoice): void {
             if ($invoice->wasChanged(['amount_paid', 'extra_cost', 'discount', 'difference_amount'])) {
                 $invoice->recalculateTotals();
@@ -72,6 +76,11 @@ class SalesInvoice extends CompanyModel
         return $this->hasMany(CustomerReceipt::class);
     }
 
+    public function salesReturns(): HasMany
+    {
+        return $this->hasMany(SalesReturn::class);
+    }
+
     public function installmentContract(): HasOne
     {
         return $this->hasOne(InstallmentContract::class);
@@ -82,10 +91,57 @@ class SalesInvoice extends CompanyModel
         return $this->hasOne(InstallmentContractArchive::class);
     }
 
+    public function installmentCancelledContract(): HasOne
+    {
+        return $this->hasOne(InstallmentCancelledContract::class);
+    }
+
     public function hasInstallmentContract(): bool
     {
         return $this->installmentContract()->exists()
-            || $this->installmentContractArchive()->exists();
+            || $this->installmentContractArchive()->exists()
+            || $this->installmentCancelledContract()->exists();
+    }
+
+    public function hasLinkedReceipts(): bool
+    {
+        return $this->receipts()->exists();
+    }
+
+    public function hasLinkedReturns(): bool
+    {
+        return $this->salesReturns()->exists();
+    }
+
+    public function canBeDeleted(): bool
+    {
+        return $this->deletionBlockReason() === null;
+    }
+
+    public function deletionBlockReason(): ?string
+    {
+        if ($this->hasInstallmentContract()) {
+            return 'هذه الفاتورة مقيدة بعقد تقسيط .. لا يجوز الغاءها';
+        }
+
+        if ($this->hasLinkedReturns()) {
+            return 'هذه الفاتورة مرتبطة بترجيعات .. لا يجوز الغاءها';
+        }
+
+        if ($this->hasLinkedReceipts()) {
+            return 'هذه الفاتورة مرتبطة بإيصالات .. لا يجوز الغاءها';
+        }
+
+        return null;
+    }
+
+    public function assertCanBeDeleted(): void
+    {
+        $reason = $this->deletionBlockReason();
+
+        if ($reason !== null) {
+            throw new \RuntimeException($reason);
+        }
     }
 
     public function recalculateTotals(): void

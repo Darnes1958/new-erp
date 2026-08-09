@@ -8,6 +8,7 @@ use App\Models\CustomerReceipt;
 use App\Models\Expense;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseReturn;
+use App\Models\RentTransaction;
 use App\Models\SalaryTransaction;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
@@ -85,6 +86,30 @@ class DailyMovementReportService
             ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('expense_date', '>=', $dateFrom))
             ->when(filled($dateTo), fn (Builder $query): Builder => $query->whereDate('expense_date', '<=', $dateTo))
             ->when(filled($warehouseId), fn (Builder $query): Builder => $query->where('warehouse_id', $warehouseId));
+    }
+
+    public function salariesDetailQuery(?string $dateFrom, ?string $dateTo, ?int $warehouseId): Builder
+    {
+        return SalaryTransaction::query()
+            ->with(['salaryProfile', 'bankAccount', 'cashBox'])
+            ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('transaction_date', '>=', $dateFrom))
+            ->when(filled($dateTo), fn (Builder $query): Builder => $query->whereDate('transaction_date', '<=', $dateTo))
+            ->when(filled($warehouseId), fn (Builder $query) => $query->whereHas(
+                'salaryProfile',
+                fn (Builder $profileQuery): Builder => $profileQuery->where('warehouse_id', $warehouseId),
+            ));
+    }
+
+    public function rentsDetailQuery(?string $dateFrom, ?string $dateTo, ?int $warehouseId): Builder
+    {
+        return RentTransaction::query()
+            ->with(['rentProfile', 'bankAccount', 'cashBox'])
+            ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('transaction_date', '>=', $dateFrom))
+            ->when(filled($dateTo), fn (Builder $query): Builder => $query->whereDate('transaction_date', '<=', $dateTo))
+            ->when(filled($warehouseId), fn (Builder $query) => $query->whereHas(
+                'rentProfile',
+                fn (Builder $profileQuery): Builder => $profileQuery->where('warehouse_id', $warehouseId),
+            ));
     }
 
     public function purchasesByWarehouseSummary(?string $dateFrom, ?string $dateTo, ?int $warehouseId): Builder
@@ -166,6 +191,20 @@ class DailyMovementReportService
             ->groupBy('transaction_type');
     }
 
+    public function rentsSummary(?string $dateFrom, ?string $dateTo, ?int $warehouseId): Builder
+    {
+        return RentTransaction::query()
+            ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('transaction_date', '>=', $dateFrom))
+            ->when(filled($dateTo), fn (Builder $query): Builder => $query->whereDate('transaction_date', '<=', $dateTo))
+            ->when(filled($warehouseId), fn (Builder $query) => $query->whereHas(
+                'rentProfile',
+                fn (Builder $profileQuery): Builder => $profileQuery->where('warehouse_id', $warehouseId),
+            ))
+            ->select('transaction_type')
+            ->selectRaw('SUM(amount) as total_amount')
+            ->groupBy('transaction_type');
+    }
+
     public function salesReturnsByDateSummary(?string $dateFrom, ?string $dateTo, ?int $warehouseId): Builder
     {
         return SalesReturn::query()
@@ -235,10 +274,20 @@ class DailyMovementReportService
             ->selectRaw('SUM(amount) as outflow_amount')
             ->groupBy('cash_box_id');
 
+        $rentOut = RentTransaction::query()
+            ->whereNotNull('cash_box_id')
+            ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('transaction_date', '>=', $dateFrom))
+            ->when(filled($dateTo), fn (Builder $query): Builder => $query->whereDate('transaction_date', '<=', $dateTo))
+            ->select('cash_box_id')
+            ->selectRaw('CAST(0 AS decimal(14, 3)) as inflow_amount')
+            ->selectRaw('SUM(amount) as outflow_amount')
+            ->groupBy('cash_box_id');
+
         $union = $customerIn
             ->unionAll($supplierIn)
             ->unionAll($expenseOut)
-            ->unionAll($salaryOut);
+            ->unionAll($salaryOut)
+            ->unionAll($rentOut);
 
         return CashBox::query()
             ->joinSub($union, 'cash_movements', 'cash_movements.cash_box_id', '=', 'cash_boxes.id')

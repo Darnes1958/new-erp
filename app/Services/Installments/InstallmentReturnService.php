@@ -13,6 +13,9 @@ use App\Models\InstallmentDeduction;
 use App\Models\InstallmentSurplus;
 use App\Models\InstallmentSuspended;
 use App\Models\WrongDeduction;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationContext;
+use App\Support\SystemOperationType;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -176,6 +179,9 @@ class InstallmentReturnService
 
     public function undoReturn(InstallmentSuspended $suspended): void
     {
+        $suspendedId = (int) $suspended->id;
+        $context = SystemOperationContext::fromSuspended($suspended);
+
         DB::connection($suspended->getConnectionName())->transaction(function () use ($suspended): void {
             $returnType = $suspended->status;
 
@@ -196,6 +202,8 @@ class InstallmentReturnService
                 $this->recalculateCancelledContract($suspended->installment_contract_id, $suspended->getConnectionName());
             }
         });
+
+        SystemOperationLogger::cancelled(SystemOperationType::INSTALLMENT_RETURN, $suspendedId, $context);
     }
 
     public function resolveContract(InstallmentSuspended $suspended): ?InstallmentContract

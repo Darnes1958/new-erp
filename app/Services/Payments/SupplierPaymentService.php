@@ -6,6 +6,8 @@ use App\Enums\ReceiptTransactionKind;
 use App\Models\CashBox;
 use App\Models\PurchaseInvoice;
 use App\Models\SupplierPayment;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationType;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
 
@@ -133,6 +135,8 @@ class SupplierPaymentService
         if ($payment->purchase_invoice_id) {
             $this->syncPurchaseInvoice((int) $payment->purchase_invoice_id);
         }
+
+        SystemOperationLogger::updated(SystemOperationType::SUPPLIER_PAYMENT, $payment->id);
     }
 
     public function afterDeleted(SupplierPayment $payment): void
@@ -140,5 +144,7 @@ class SupplierPaymentService
         if ($payment->purchase_invoice_id) {
             $this->syncPurchaseInvoice((int) $payment->purchase_invoice_id);
         }
+
+        SystemOperationLogger::cancelled(SystemOperationType::SUPPLIER_PAYMENT, $payment->id);
     }
 }

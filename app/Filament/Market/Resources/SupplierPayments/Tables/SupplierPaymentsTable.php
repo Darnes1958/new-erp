@@ -5,10 +5,14 @@ namespace App\Filament\Market\Resources\SupplierPayments\Tables;
 use App\Enums\ReceiptTransactionKind;
 use App\Models\SupplierPayment;
 use App\Services\Payments\SupplierPaymentService;
+use App\Services\Pdf\PaymentReceiptVoucherPdfService;
+use App\Support\PdfDownload;
 use App\Support\ErpNumber;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -94,6 +98,14 @@ class SupplierPaymentsTable
                     }),
             ])
             ->recordActions([
+                Action::make('printVoucher')
+                    ->label('طباعة')
+                    ->icon(Heroicon::OutlinedPrinter)
+                    ->iconButton()
+                    ->color('info')
+                    ->action(fn (SupplierPayment $record) => PdfDownload::streamed(
+                        app(PaymentReceiptVoucherPdfService::class)->supplierPayment($record),
+                    )),
                 EditAction::make()
                     ->visible(fn (SupplierPayment $record): bool => (
                         (int) $record->transaction_kind->value < ReceiptTransactionKind::WithInvoicePayment->value

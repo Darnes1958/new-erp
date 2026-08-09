@@ -35,6 +35,8 @@ class OurCompanySettingsSync
             ?? FilamentSidebarStyle::DEFAULT_TABLE_FONT_SIZE_PX;
         $data['table_header_font_size_px'] = $settings?->table_header_font_size_px
             ?? FilamentSidebarStyle::DEFAULT_TABLE_HEADER_FONT_SIZE_PX;
+        $data['user_message'] = $settings?->user_message;
+        $data['alert_message'] = $settings?->alert_message;
 
         return $data;
     }
@@ -89,6 +91,8 @@ class OurCompanySettingsSync
                     10,
                     18,
                 ),
+                'user_message' => filled($data['user_message'] ?? null) ? $data['user_message'] : null,
+                'alert_message' => filled($data['alert_message'] ?? null) ? $data['alert_message'] : null,
             ],
         );
     }

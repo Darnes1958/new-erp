@@ -2,7 +2,7 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Widgets\PanelSwitcherWidget;
+use App\Support\DashboardWidgets;
 use App\Http\Middleware\FilamentAuthenticate;
 use App\Http\Middleware\FilamentAuthenticateSession;
 use App\Support\FilamentSidebarStyle;
@@ -50,9 +50,7 @@ class FinancePanelProvider extends PanelProvider
                 in: app_path('Filament/Finance/Widgets'),
                 for: 'App\\Filament\\Finance\\Widgets',
             )
-            ->widgets([
-                PanelSwitcherWidget::class,
-            ])
+            ->widgets(DashboardWidgets::forPanel())
             ->navigationGroups([
                 NavigationGroup::make('مصروفات'),
                 NavigationGroup::make('مرتبات'),

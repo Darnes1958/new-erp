@@ -123,6 +123,7 @@ class AppServiceProvider extends ServiceProvider
                     <div class="fi-topbar-panel-tools">
                         @livewire('panel-switcher')
                         @livewire('company-switcher')
+                        @include('components.database-backup-button')
                     </div>
                 BLADE
             ),

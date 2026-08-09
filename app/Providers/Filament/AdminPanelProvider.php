@@ -4,7 +4,13 @@ namespace App\Providers\Filament;
 
 use App\Http\Middleware\FilamentAuthenticate;
 use App\Http\Middleware\FilamentAuthenticateSession;
-use App\Filament\Widgets\PanelSwitcherWidget;
+use App\Filament\Admin\Support\AdminNavigationGroup;
+use App\Filament\Market\Pages\Reports\ProfitReportPage;
+use App\Filament\Market\Pages\Reports\WarehouseProfitReportPage;
+use App\Filament\Market\Resources\InventoryCountLines\InventoryCountLineResource;
+use App\Filament\Market\Resources\InventoryCountSessions\InventoryCountSessionResource;
+use App\Filament\Market\Widgets\ProfitChartWidget;
+use App\Support\DashboardWidgets;
 use App\Support\FilamentSidebarStyle;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -45,16 +51,26 @@ class AdminPanelProvider extends PanelProvider
             )
             ->pages([
                 Dashboard::class,
+                ProfitReportPage::class,
+                WarehouseProfitReportPage::class,
+            ])
+            ->resources([
+                InventoryCountSessionResource::class,
+                InventoryCountLineResource::class,
             ])
             ->discoverWidgets(
                 in: app_path('Filament/Admin/Widgets'),
                 for: 'App\\Filament\\Admin\\Widgets',
             )
-            ->widgets([
-                PanelSwitcherWidget::class,
+            ->widgets(DashboardWidgets::forPanel())
+            ->livewireComponents([
+                ProfitChartWidget::class,
             ])
             ->navigationGroups([
+                NavigationGroup::make(AdminNavigationGroup::Management),
                 NavigationGroup::make('المستخدمون'),
+                NavigationGroup::make('مراقبة النظام'),
+                NavigationGroup::make('استيراد Excel'),
                 NavigationGroup::make('إعدادات النظام'),
             ])
             ->middleware([

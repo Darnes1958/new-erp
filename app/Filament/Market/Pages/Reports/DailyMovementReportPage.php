@@ -8,6 +8,8 @@ use App\Filament\Market\Widgets\DailyMovement\Detail\CustomerReceiptsTableWidget
 use App\Filament\Market\Widgets\DailyMovement\Detail\ExpensesTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Detail\PurchaseReturnsTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Detail\PurchasesTableWidget;
+use App\Filament\Market\Widgets\DailyMovement\Detail\RentsTableWidget;
+use App\Filament\Market\Widgets\DailyMovement\Detail\SalariesTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Detail\SalesReturnsTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Detail\SalesTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Detail\SupplierPaymentsTableWidget;
@@ -16,12 +18,14 @@ use App\Filament\Market\Widgets\DailyMovement\Summary\CustomerReceiptsSummaryTab
 use App\Filament\Market\Widgets\DailyMovement\Summary\ExpensesSummaryTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Summary\PurchaseReturnsSummaryTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Summary\PurchasesSummaryTableWidget;
+use App\Filament\Market\Widgets\DailyMovement\Summary\RentsSummaryTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Summary\SalariesSummaryTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Summary\SalesReturnsSummaryTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Summary\SalesSummaryTableWidget;
 use App\Filament\Market\Widgets\DailyMovement\Summary\DailyMovementStatsOverviewWidget;
 use App\Filament\Market\Widgets\DailyMovement\Summary\SupplierPaymentsSummaryTableWidget;
 use App\Models\Warehouse;
+use App\Services\Excel\MarketExcelService;
 use App\Services\Market\DailyMovementReportService;
 use App\Services\Pdf\DailyMovementPdfService;
 use App\Support\PdfDownload;
@@ -91,7 +95,7 @@ class DailyMovementReportPage extends Page implements HasActions, HasForms
         }
 
         $today = now()->toDateString();
-        $this->dateFrom ??= $today;
+        $this->dateFrom ??= now()->startOfYear()->toDateString();
         $this->dateTo ??= $today;
 
         $this->refreshFiltersForm();
@@ -128,6 +132,7 @@ class DailyMovementReportPage extends Page implements HasActions, HasForms
                             ->live(),
                         Actions::make([
                             InstallmentListPrintActions::compactPrint('print', fn () => $this->downloadPdf()),
+                            InstallmentListPrintActions::compactExcel('exportExcel', fn () => $this->downloadExcel()),
                         ])
                             ->columnSpan(2)
                             ->extraAttributes(['class' => 'market-compact-exports']),
@@ -181,6 +186,7 @@ class DailyMovementReportPage extends Page implements HasActions, HasForms
                 CustomerReceiptsSummaryTableWidget::make($filters),
                 ExpensesSummaryTableWidget::make($filters),
                 SalariesSummaryTableWidget::make($filters),
+                RentsSummaryTableWidget::make($filters),
                 SalesReturnsSummaryTableWidget::make($filters),
                 PurchaseReturnsSummaryTableWidget::make($filters),
                 CashBoxesSummaryTableWidget::make($filters),
@@ -195,6 +201,8 @@ class DailyMovementReportPage extends Page implements HasActions, HasForms
             SalesReturnsTableWidget::make($filters),
             PurchaseReturnsTableWidget::make($filters),
             ExpensesTableWidget::make($filters),
+            SalariesTableWidget::make($filters),
+            RentsTableWidget::make($filters),
         ];
     }
 
@@ -261,6 +269,39 @@ class DailyMovementReportPage extends Page implements HasActions, HasForms
                 $this->warehouseId,
                 $warehouseName,
             ),
+        );
+    }
+
+    protected function downloadExcel(): mixed
+    {
+        if (! filled($this->dateFrom) && ! filled($this->dateTo)) {
+            Notification::make()->title('حدد الفترة الزمنية')->warning()->send();
+
+            return null;
+        }
+
+        $service = app(DailyMovementReportService::class);
+        $excelService = app(MarketExcelService::class);
+        $warehouseName = filled($this->warehouseId)
+            ? Warehouse::query()->whereKey($this->warehouseId)->value('name')
+            : null;
+
+        if ($this->activeTab === 'summary') {
+            return $excelService->dailyMovementSummary(
+                $service,
+                $this->dateFrom,
+                $this->dateTo,
+                $this->warehouseId,
+                $warehouseName,
+            );
+        }
+
+        return $excelService->dailyMovementDetail(
+            $service,
+            $this->dateFrom,
+            $this->dateTo,
+            $this->warehouseId,
+            $warehouseName,
         );
     }
 }

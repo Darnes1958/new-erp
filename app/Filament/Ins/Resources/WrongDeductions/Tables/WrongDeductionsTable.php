@@ -76,7 +76,10 @@ class WrongDeductionsTable
                                 $data['date_to'] ?? null,
                                 fn (Builder $query, $date): Builder => $query->whereDate('deduction_date', '<=', $date),
                             );
-                    }),
+                    })
+                    ->default([
+                        'date_from' => now()->startOfYear()->toDateString(),
+                    ]),
             ])
             ->recordUrl(null)
             ->recordActions([

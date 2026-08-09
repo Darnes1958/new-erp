@@ -29,6 +29,8 @@ class DailyMovementPdfService
             'salesReturns' => $service->salesReturnsDetailQuery($dateFrom, $dateTo, $warehouseId)->get(),
             'purchaseReturns' => $service->purchaseReturnsDetailQuery($dateFrom, $dateTo, $warehouseId)->get(),
             'expenses' => $service->expensesDetailQuery($dateFrom, $dateTo, $warehouseId)->get(),
+            'salaries' => $service->salariesDetailQuery($dateFrom, $dateTo, $warehouseId)->get(),
+            'rents' => $service->rentsDetailQuery($dateFrom, $dateTo, $warehouseId)->get(),
             'service' => $service,
         ])->name('daily-movement-detail.pdf');
     }
@@ -53,6 +55,7 @@ class DailyMovementPdfService
             'customerReceipts' => $service->customerReceiptsSummary($dateFrom, $dateTo, $warehouseId)->get(),
             'expenses' => $service->expensesSummary($dateFrom, $dateTo, $warehouseId)->get(),
             'salaries' => $service->salariesSummary($dateFrom, $dateTo, $warehouseId)->get(),
+            'rents' => $service->rentsSummary($dateFrom, $dateTo, $warehouseId)->get(),
             'salesReturns' => $service->salesReturnsByDateSummary($dateFrom, $dateTo, $warehouseId)->get(),
             'purchaseReturns' => $service->purchaseReturnsByDateSummary($dateFrom, $dateTo, $warehouseId)->get(),
             'cashBoxes' => $service->cashBoxesSummary($dateFrom, $dateTo, $warehouseId)->get(),

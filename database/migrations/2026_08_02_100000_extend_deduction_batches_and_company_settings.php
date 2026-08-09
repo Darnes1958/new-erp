@@ -11,8 +11,10 @@ return new class extends Migration
 
     public function up(): void
     {
-        if (! Schema::hasColumn('company_settings', 'installment_by_payroll_bank')) {
-            Schema::table('company_settings', function (Blueprint $table): void {
+        $central = (string) config('erp.central_connection', 'sqlsrv');
+
+        if (! Schema::connection($central)->hasColumn('company_settings', 'installment_by_payroll_bank')) {
+            Schema::connection($central)->table('company_settings', function (Blueprint $table): void {
                 $table->boolean('installment_by_payroll_bank')
                     ->default(true)
                     ->after('link_sales_to_installments');
@@ -66,6 +68,8 @@ return new class extends Migration
 
     public function down(): void
     {
+        $central = (string) config('erp.central_connection', 'sqlsrv');
+
         $this->onEachCompanyConnection(function (string $connection): void {
             if (! Schema::connection($connection)->hasTable('deduction_batches')) {
                 return;
@@ -110,8 +114,8 @@ return new class extends Migration
             }
         });
 
-        if (Schema::hasColumn('company_settings', 'installment_by_payroll_bank')) {
-            Schema::table('company_settings', function (Blueprint $table): void {
+        if (Schema::connection($central)->hasColumn('company_settings', 'installment_by_payroll_bank')) {
+            Schema::connection($central)->table('company_settings', function (Blueprint $table): void {
                 $table->dropColumn('installment_by_payroll_bank');
             });
         }

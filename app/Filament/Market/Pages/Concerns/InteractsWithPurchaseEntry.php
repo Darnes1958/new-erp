@@ -18,6 +18,7 @@ use App\Services\Inventory\PurchaseInventoryService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
@@ -342,6 +343,7 @@ trait InteractsWithPurchaseEntry
                         Action::make('edit_item')
                             ->model(Item::class)
                             ->modalHeading('تعديل الصنف')
+                            ->modalWidth(Width::ThreeExtraLarge)
                             ->schema(ItemQuickForm::schema(forEdit: true))
                             ->fillForm(function (PurchaseInvoiceLineWork $record): array {
                                 $item = Item::query()->findOrFail($record->item_id);

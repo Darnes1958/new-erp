@@ -5,6 +5,8 @@ namespace App\Services\Finance;
 use App\Enums\SalaryTransactionType;
 use App\Models\SalaryProfile;
 use App\Models\SalaryTransaction;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationType;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -65,7 +67,16 @@ class SalaryTransactionService
     public function cancelMonthlySalaries(string $periodMonth): void
     {
         DB::transaction(function () use ($periodMonth): void {
+            $transactions = SalaryTransaction::query()
+                ->where('period_month', $periodMonth)
+                ->get(['id']);
+
             SalaryTransaction::query()->where('period_month', $periodMonth)->delete();
+
+            foreach ($transactions as $transaction) {
+                SystemOperationLogger::cancelled(SystemOperationType::SALARY, $transaction->id);
+            }
+
             $this->balances->recalculateSalaryProfiles();
         });
     }

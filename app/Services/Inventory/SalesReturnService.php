@@ -8,6 +8,9 @@ use App\Models\SalesInvoiceLine;
 use App\Models\SalesReturn;
 use App\Models\StockMovement;
 use App\Models\WarehouseStock;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationContext;
+use App\Support\SystemOperationType;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
@@ -123,7 +126,15 @@ class SalesReturnService
             'profit' => round((float) $line->profit + $profitDelta, 3),
         ]);
 
+        $invoiceId = $invoice->id;
+        $context = SystemOperationContext::make(
+            customerId: $invoice->customer_id ? (int) $invoice->customer_id : null,
+            itemId: $salesReturn->item_id ? (int) $salesReturn->item_id : null,
+        );
+
         $salesReturn->delete();
+
+        SystemOperationLogger::cancelled(SystemOperationType::SALE_RETURN, $invoiceId, $context);
     }
 
     protected function reverseFifoAllocations(SalesInvoiceLine $line, float $returnQtyPrimary): void

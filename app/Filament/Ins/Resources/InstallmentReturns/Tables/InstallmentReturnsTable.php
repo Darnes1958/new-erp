@@ -105,7 +105,10 @@ class InstallmentReturnsTable
                                 $data['date_to'] ?? null,
                                 fn (Builder $query, $date): Builder => $query->whereDate('suspended_date', '<=', $date),
                             );
-                    }),
+                    })
+                    ->default([
+                        'date_from' => now()->startOfYear()->toDateString(),
+                    ]),
             ])
             ->recordUrl(null)
             ->recordActions([

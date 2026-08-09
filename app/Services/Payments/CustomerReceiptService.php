@@ -6,6 +6,9 @@ use App\Enums\ReceiptTransactionKind;
 use App\Models\CashBox;
 use App\Models\CustomerReceipt;
 use App\Models\SalesInvoice;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationContext;
+use App\Support\SystemOperationType;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
 
@@ -134,6 +137,12 @@ class CustomerReceiptService
         if ($receipt->sales_invoice_id) {
             $this->syncSalesInvoice((int) $receipt->sales_invoice_id);
         }
+
+        SystemOperationLogger::updated(
+            SystemOperationType::CUSTOMER_RECEIPT,
+            $receipt->id,
+            SystemOperationContext::customer($receipt->customer_id ? (int) $receipt->customer_id : null),
+        );
     }
 
     public function afterDeleted(CustomerReceipt $receipt): void
@@ -141,5 +150,11 @@ class CustomerReceiptService
         if ($receipt->sales_invoice_id) {
             $this->syncSalesInvoice((int) $receipt->sales_invoice_id);
         }
+
+        SystemOperationLogger::cancelled(
+            SystemOperationType::CUSTOMER_RECEIPT,
+            $receipt->id,
+            SystemOperationContext::customer($receipt->customer_id ? (int) $receipt->customer_id : null),
+        );
     }
 }

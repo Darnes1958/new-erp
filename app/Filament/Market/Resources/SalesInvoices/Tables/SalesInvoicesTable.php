@@ -4,10 +4,13 @@ namespace App\Filament\Market\Resources\SalesInvoices\Tables;
 
 use App\Filament\Market\Resources\SalesInvoices\Pages\EditSell;
 use App\Filament\Market\Resources\SalesInvoices\Pages\SalesReturnEntry;
+use App\Models\SalesInvoice;
+use App\Services\Inventory\SalesInvoiceCancelService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -104,7 +107,22 @@ class SalesInvoicesTable
                     ->color('primary')
                     ->tooltip('ترجيع')
                     ->url(fn ($record): string => SalesReturnEntry::getUrl(['record' => $record])),
-                DeleteAction::make()->iconButton(),
+                DeleteAction::make()
+                    ->iconButton()
+                    ->visible(fn (SalesInvoice $record): bool => $record->canBeDeleted())
+                    ->before(function (SalesInvoice $record): void {
+                        try {
+                            $record->assertCanBeDeleted();
+                        } catch (\RuntimeException $exception) {
+                            Notification::make()
+                                ->title($exception->getMessage())
+                                ->warning()
+                                ->send();
+
+                            throw $exception;
+                        }
+                    })
+                    ->using(fn (SalesInvoice $record) => app(SalesInvoiceCancelService::class)->cancel($record)),
             ]);
     }
 }

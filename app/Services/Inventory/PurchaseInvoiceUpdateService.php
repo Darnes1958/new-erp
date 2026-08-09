@@ -7,6 +7,8 @@ use App\Models\PurchaseInvoiceLine;
 use App\Models\PurchaseInvoiceLineWork;
 use App\Models\PurchaseInvoiceWork;
 use App\Models\SupplierPayment;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationType;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -159,6 +161,8 @@ class PurchaseInvoiceUpdateService
                 'notes' => '',
             ]);
         });
+
+        SystemOperationLogger::updated(SystemOperationType::PURCHASE, $invoice->id);
 
         return null;
     }

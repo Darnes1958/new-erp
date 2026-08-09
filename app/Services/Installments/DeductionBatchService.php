@@ -13,6 +13,8 @@ use App\Models\InstallmentCancelledContract;
 use App\Models\InstallmentContract;
 use App\Models\InstallmentContractArchive;
 use App\Models\WrongDeduction;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationType;
 use App\Support\InstallmentBankScope;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -388,8 +390,11 @@ class DeductionBatchService
         }
 
         DB::connection($batch->getConnectionName())->transaction(function () use ($batch): void {
+            $batchId = (int) $batch->id;
             $batch->lines()->delete();
             $batch->delete();
+
+            SystemOperationLogger::cancelled(SystemOperationType::DEDUCTION_BATCH, $batchId);
         });
     }
 

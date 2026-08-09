@@ -7,6 +7,7 @@ use App\Support\FilamentSidebarStyle;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
@@ -62,6 +63,19 @@ class OurCompanyForm
                     ->default(true)
                     ->visible(fn (): bool => (bool) Auth::user()?->is_prog),
             ])->columns(2),
+            Section::make('رسائل الصفحة الرئيسية')
+                ->description('تظهر في لوحة التحكم لجميع المستخدمين في هذه الشركة.')
+                ->schema([
+                    Textarea::make('user_message')
+                        ->label('رسالة النظام')
+                        ->rows(4)
+                        ->columnSpanFull(),
+                    Textarea::make('alert_message')
+                        ->label('تنبيه مهم')
+                        ->rows(3)
+                        ->columnSpanFull(),
+                ])
+                ->visible(fn (): bool => (bool) Auth::user()?->is_prog),
             Section::make('القائمة الجانبية')
                 ->description('تباعد عناصر القائمة الجانبية فقط.')
                 ->schema([

@@ -2,8 +2,13 @@
 
 namespace App\Filament\Market\Resources\Items\Tables;
 
+use App\Models\Item;
+use App\Services\Pdf\ItemLabelPdfService;
+use App\Support\PdfDownload;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -54,6 +59,15 @@ class ItemsTable
                     ->relationship('brand', 'name'),
             ])
             ->recordActions([
+                Action::make('printLabel')
+                    ->label('PDF')
+                    ->tooltip('طباعة ملصق PDF')
+                    ->icon(Heroicon::OutlinedPrinter)
+                    ->iconButton()
+                    ->color('gray')
+                    ->action(fn (Item $record) => PdfDownload::streamed(
+                        app(ItemLabelPdfService::class)->single($record),
+                    )),
                 EditAction::make()->iconButton(),
                 DeleteAction::make()->iconButton(),
             ]);

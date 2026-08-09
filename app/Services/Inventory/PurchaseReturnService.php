@@ -7,6 +7,9 @@ use App\Models\PurchaseInvoiceLine;
 use App\Models\PurchaseReturn;
 use App\Models\StockMovement;
 use App\Models\WarehouseStock;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationContext;
+use App\Support\SystemOperationType;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
@@ -125,7 +128,14 @@ class PurchaseReturnService
             notes: 'إلغاء ترجيع مشتريات — فاتورة رقم '.(string) $invoice->id,
         );
 
+        $invoiceId = $invoice->id;
+        $context = SystemOperationContext::item(
+            $purchaseReturn->item_id ? (int) $purchaseReturn->item_id : null,
+        );
+
         $purchaseReturn->delete();
+
+        SystemOperationLogger::cancelled(SystemOperationType::PURCHASE_RETURN, $invoiceId, $context);
     }
 
     protected function decreaseWarehouseStock(

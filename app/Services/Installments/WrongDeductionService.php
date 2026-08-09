@@ -6,6 +6,8 @@ use App\Enums\InstallmentDeductionType;
 use App\Enums\InstallmentRecordStatus;
 use App\Models\InstallmentContract;
 use App\Models\WrongDeduction;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationType;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -90,7 +92,9 @@ class WrongDeductionService
                 continue;
             }
 
+            $recordId = (int) $record->id;
             $record->delete();
+            SystemOperationLogger::cancelled(SystemOperationType::WRONG_DEDUCTION, $recordId);
             $count++;
         }
 

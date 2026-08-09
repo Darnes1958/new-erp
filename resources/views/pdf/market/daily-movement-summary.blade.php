@@ -242,6 +242,26 @@
         </tbody>
     </table>
 
+    <h3>الإيجارات</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>البيان</th>
+            <th>المبلغ</th>
+        </tr>
+        </thead>
+        <tbody>
+        @forelse ($rents as $row)
+            <tr>
+                <td>{{ $row->transaction_type }}</td>
+                <td>{{ number_format((float) $row->total_amount, 3, '.', ',') }}</td>
+            </tr>
+        @empty
+            <tr><td colspan="2" style="text-align: center;">لا توجد بيانات</td></tr>
+        @endforelse
+        </tbody>
+    </table>
+
     <h3>ترجيع مبيعات</h3>
     <table>
         <thead>

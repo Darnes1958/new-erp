@@ -106,4 +106,87 @@ class InstallmentContractArchiveService
             return $archive->refresh();
         });
     }
+
+    public function restoreToActive(InstallmentContractArchive $archive): InstallmentContract
+    {
+        $connection = $archive->getConnectionName();
+
+        return DB::connection($connection)->transaction(function () use ($archive, $connection): InstallmentContract {
+            if (InstallmentContract::on($connection)->whereKey($archive->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'id' => 'يوجد عقد نشط بنفس الرقم.',
+                ]);
+            }
+
+            $attributes = $archive->only([
+                'id',
+                'customer_id',
+                'installment_bank_id',
+                'workplace_id',
+                'payroll_bank_id',
+                'bank_account_number',
+                'contract_start',
+                'contract_end',
+                'contract_total',
+                'installment_count',
+                'installment_amount',
+                'total_paid',
+                'balance',
+                'sales_invoice_id',
+                'cheques_in',
+                'cheques_out',
+                'notes',
+                'created_by',
+            ]);
+
+            $contract = InstallmentContract::on($connection)->create($attributes);
+
+            $archive->deductions()
+                ->orderBy('id')
+                ->each(function (InstallmentDeductionArchive $deduction) use ($contract, $connection): void {
+                    InstallmentDeduction::on($connection)->create([
+                        'installment_contract_id' => $contract->id,
+                        'sequence' => $deduction->sequence,
+                        'deducted_amount' => $deduction->deducted_amount,
+                        'deduction_date' => $deduction->deduction_date,
+                        'installment_due_date' => $deduction->installment_due_date,
+                        'deduction_type_id' => $deduction->deduction_type_id,
+                        'notes' => $deduction->notes,
+                        'batch_id' => $deduction->batch_id,
+                        'remaining_balance' => $deduction->remaining_balance,
+                        'created_by' => $deduction->created_by,
+                        'created_at' => $deduction->created_at,
+                        'updated_at' => $deduction->updated_at,
+                    ]);
+
+                    $deduction->delete();
+                });
+
+            InstallmentSurplus::on($connection)
+                ->where('contractable_type', $archive->getMorphClass())
+                ->where('contractable_id', $archive->id)
+                ->update([
+                    'contractable_type' => $contract->getMorphClass(),
+                ]);
+
+            InstallmentSuspended::on($connection)
+                ->where('contractable_type', $archive->getMorphClass())
+                ->where('contractable_id', $archive->id)
+                ->update([
+                    'contractable_type' => $contract->getMorphClass(),
+                ]);
+
+            InstallmentSuspended::on($connection)
+                ->whereNull('installment_contract_id')
+                ->where('contractable_type', $contract->getMorphClass())
+                ->where('contractable_id', $contract->id)
+                ->update([
+                    'installment_contract_id' => $contract->id,
+                ]);
+
+            $archive->delete();
+
+            return $contract->refresh();
+        });
+    }
 }

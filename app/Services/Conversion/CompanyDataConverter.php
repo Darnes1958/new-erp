@@ -34,6 +34,8 @@ class CompanyDataConverter
             'payments' => fn () => $this->convertPayments(),
             'installments' => fn () => $this->convertInstallments(),
             'finance' => fn () => $this->convertFinance(),
+            'excel_settings' => fn () => $this->convertBankExcelImportSettings(),
+            'operation_logs' => fn () => $this->convertSystemOperationLogs(),
         ];
     }
 
@@ -77,7 +79,8 @@ class CompanyDataConverter
         $this->log('Clearing target database...');
 
         $tables = [
-            'wrong_deduction_accounts', 'wrong_deductions', 'deduction_batch_lines', 'deduction_batches',
+            'wrong_deduction_accounts', 'wrong_deductions', 'deduction_import_date_ranges',
+            'deduction_import_staging_lines', 'bank_excel_import_settings', 'deduction_batch_lines', 'deduction_batches',
             'installment_suspended', 'installment_cheques', 'installment_stops_without_contract',
             'installment_stops', 'installment_surplus_archives', 'installment_surplus',
             'installment_deduction_archives', 'installment_deductions',
@@ -91,6 +94,7 @@ class CompanyDataConverter
             'bank_accounts', 'cash_boxes', 'suppliers', 'customers',
             'rent_transactions', 'rent_profiles', 'salary_transactions', 'salary_profiles',
             'expenses', 'expense_types',
+            'system_operation_logs',
             'customer_types', 'warehouses', 'brands', 'item_types', 'units',
         ];
 
@@ -779,6 +783,31 @@ class CompanyDataConverter
         ])->all());
 
         $this->convertWrongDeductionAccounts();
+        $this->convertBankExcelImportSettings();
+    }
+
+    protected function convertBankExcelImportSettings(): void
+    {
+        try {
+            (new ExcelImportSettingsConverter($this->target, $this->source))->convert();
+        } catch (RuntimeException $exception) {
+            $this->log($exception->getMessage());
+        }
+
+        try {
+            (new DeductionImportDateRangesConverter($this->source, $this->target))->convert();
+        } catch (RuntimeException $exception) {
+            $this->log($exception->getMessage());
+        }
+    }
+
+    protected function convertSystemOperationLogs(): void
+    {
+        try {
+            (new SystemOperationLogsConverter($this->source, $this->target))->convert();
+        } catch (RuntimeException $exception) {
+            $this->log($exception->getMessage());
+        }
     }
 
     protected function convertWrongDeductionAccounts(): void

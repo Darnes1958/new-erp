@@ -2,6 +2,8 @@
 
 namespace App\Filament\Market\Resources\CustomerReceipts\Pages;
 
+use App\Enums\ReceiptListKind;
+use App\Filament\Market\Resources\Concerns\PrintsPaymentReceiptVoucher;
 use App\Filament\Market\Resources\CustomerReceipts\CustomerReceiptResource;
 use App\Services\Payments\CustomerReceiptService;
 use App\Support\ProgrammingError;
@@ -14,7 +16,14 @@ use Throwable;
 
 class EditCustomerReceipt extends EditRecord
 {
+    use PrintsPaymentReceiptVoucher;
+
     protected static string $resource = CustomerReceiptResource::class;
+
+    protected function receiptListKind(): ReceiptListKind
+    {
+        return ReceiptListKind::Customer;
+    }
 
     protected ?int $previousSalesInvoiceId = null;
 
@@ -49,6 +58,7 @@ class EditCustomerReceipt extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->printReceiptVoucherHeaderAction(),
             DeleteAction::make()
                 ->visible(fn (): bool => Auth::user()?->can('الغاء ايصالات زبائن')
                     || Auth::user()?->can('االغاء ايصالات زبائن')

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PurchaseInvoice extends CompanyModel
 {
@@ -29,6 +30,10 @@ class PurchaseInvoice extends CompanyModel
 
     protected static function booted(): void
     {
+        static::deleting(function (PurchaseInvoice $invoice): void {
+            $invoice->assertCanBeDeleted();
+        });
+
         static::saved(function (PurchaseInvoice $invoice): void {
             if ($invoice->wasChanged(['amount_paid', 'discount'])) {
                 $invoice->recalculateTotals();
@@ -59,6 +64,47 @@ class PurchaseInvoice extends CompanyModel
     public function supplierPayments(): HasMany
     {
         return $this->hasMany(SupplierPayment::class);
+    }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class);
+    }
+
+    public function destinationWarehouseTransfer(): HasOne
+    {
+        return $this->hasOne(WarehouseTransfer::class, 'destination_purchase_invoice_id');
+    }
+
+    public function canBeDeleted(): bool
+    {
+        return $this->deletionBlockReason() === null;
+    }
+
+    public function deletionBlockReason(): ?string
+    {
+        if ($this->purchaseReturns()->exists()) {
+            return 'هذه الفاتورة مرتبطة بترجيعات .. لا يجوز الغاءها';
+        }
+
+        if ($this->supplierPayments()->exists()) {
+            return 'هذه الفاتورة مرتبطة بإيصالات موردين .. لا يجوز الغاءها';
+        }
+
+        if ($this->destinationWarehouseTransfer()->exists()) {
+            return 'هذه الفاتورة مرتبطة بتحويل مخزن .. لا يجوز الغاءها';
+        }
+
+        return null;
+    }
+
+    public function assertCanBeDeleted(): void
+    {
+        $reason = $this->deletionBlockReason();
+
+        if ($reason !== null) {
+            throw new \RuntimeException($reason);
+        }
     }
 
     public static function signedPaymentAmount(SupplierPayment $payment, ?float $amountOverride = null): float

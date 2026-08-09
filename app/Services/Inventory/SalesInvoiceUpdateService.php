@@ -7,7 +7,11 @@ use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceLine;
 use App\Models\SalesInvoiceLineWork;
 use App\Models\SalesInvoiceWork;
+use App\Services\Installments\InstallmentContractService;
 use App\Services\Payments\CustomerReceiptService;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationContext;
+use App\Support\SystemOperationType;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -71,6 +75,16 @@ class SalesInvoiceUpdateService
                     return 'لا يمكن تعديل كمية أو صنف بند تم ترجيعه';
                 }
             }
+        }
+
+        $contractError = app(InstallmentContractService::class)->validateSalesInvoiceUpdate(
+            $invoice,
+            (float) $work->grand_total,
+            (float) $work->balance,
+        );
+
+        if ($contractError !== null) {
+            return $contractError;
         }
 
         DB::connection($invoice->getConnectionName())->transaction(function () use (
@@ -143,6 +157,8 @@ class SalesInvoiceUpdateService
                 'notes' => $work->notes,
             ]);
 
+            app(InstallmentContractService::class)->syncFromSalesInvoice($invoice->refresh());
+
             SalesInvoiceLineWork::query()
                 ->where('sales_invoice_work_id', $work->id)
                 ->delete();
@@ -163,6 +179,12 @@ class SalesInvoiceUpdateService
                 'notes' => '',
             ]);
         });
+
+        SystemOperationLogger::updated(
+            SystemOperationType::SALE,
+            $invoice->id,
+            SystemOperationContext::customer($invoice->customer_id ? (int) $invoice->customer_id : null),
+        );
 
         return null;
     }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Market\Resources\SupplierPayments\Pages;
 
+use App\Enums\ReceiptListKind;
+use App\Filament\Market\Resources\Concerns\PrintsPaymentReceiptVoucher;
 use App\Filament\Market\Resources\SupplierPayments\SupplierPaymentResource;
 use App\Services\Payments\SupplierPaymentService;
 use App\Support\ProgrammingError;
@@ -14,7 +16,14 @@ use Throwable;
 
 class EditSupplierPayment extends EditRecord
 {
+    use PrintsPaymentReceiptVoucher;
+
     protected static string $resource = SupplierPaymentResource::class;
+
+    protected function receiptListKind(): ReceiptListKind
+    {
+        return ReceiptListKind::Supplier;
+    }
 
     protected ?int $previousPurchaseInvoiceId = null;
 
@@ -49,6 +58,7 @@ class EditSupplierPayment extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->printReceiptVoucherHeaderAction(),
             DeleteAction::make()
                 ->visible(fn (): bool => Auth::user()?->can('الغاء ايصالات موردين') || Auth::user()?->is_prog)
                 ->after(function (): void {

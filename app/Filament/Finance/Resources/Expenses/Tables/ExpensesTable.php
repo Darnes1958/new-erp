@@ -4,6 +4,8 @@ namespace App\Filament\Finance\Resources\Expenses\Tables;
 
 use App\Models\Expense;
 use App\Models\Warehouse;
+use App\Services\SystemOperationLogger;
+use App\Support\SystemOperationType;
 use Carbon\Carbon;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -99,7 +101,10 @@ class ExpensesTable
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make()
-                    ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('الغاء مصروفات')),
+                    ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('الغاء مصروفات'))
+                    ->after(function (Expense $record): void {
+                        SystemOperationLogger::cancelled(SystemOperationType::EXPENSE, $record->id);
+                    }),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

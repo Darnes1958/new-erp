@@ -14,6 +14,7 @@ use Filament\Forms\Components\TableSelect;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
@@ -71,6 +72,7 @@ class PurchaseLineForm
                         CreateAction::make('create_item')
                             ->model(Item::class)
                             ->modalHeading(new HtmlString('<span class="text-primary-600">إضافة صنف جديد</span>'))
+                            ->modalWidth(Width::ThreeExtraLarge)
                             ->icon(Heroicon::Plus)
                             ->color('success')
                             ->iconButton()

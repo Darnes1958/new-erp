@@ -11,7 +11,7 @@ use App\Filament\Market\Pages\InpWarehouseTransfer\InpWarehouseTransfer;
 use App\Filament\Market\Pages\ListSalesReturns;
 use App\Filament\Market\Pages\QuickSell\QuickSell;
 use App\Filament\Market\Support\MarketNavigationGroup;
-use App\Filament\Widgets\PanelSwitcherWidget;
+use App\Support\DashboardWidgets;
 use App\Support\FilamentSidebarStyle;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -65,9 +65,7 @@ class MarketPanelProvider extends PanelProvider
                 in: app_path('Filament/Market/Widgets'),
                 for: 'App\\Filament\\Market\\Widgets',
             )
-            ->widgets([
-                PanelSwitcherWidget::class,
-            ])
+            ->widgets(DashboardWidgets::forPanel())
             ->navigationGroups([
                 NavigationGroup::make(MarketNavigationGroup::PurchaseInvoices),
                 NavigationGroup::make(MarketNavigationGroup::SalesInvoices),
@@ -75,6 +73,7 @@ class MarketPanelProvider extends PanelProvider
                 NavigationGroup::make(MarketNavigationGroup::WarehousesItems),
                 NavigationGroup::make(MarketNavigationGroup::DailyMovement),
                 NavigationGroup::make(MarketNavigationGroup::ReceiptsAndPayments),
+                NavigationGroup::make(MarketNavigationGroup::BanksAndCashBoxes),
             ])
             ->middleware([
                 EncryptCookies::class,

@@ -254,6 +254,66 @@
         @endforelse
         </tbody>
     </table>
+
+    <h3>المرتبات</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>التاريخ</th>
+            <th>الموظف</th>
+            <th>البيان</th>
+            <th>دفعت من</th>
+            <th>عن شهر</th>
+            <th>المبلغ</th>
+            <th>ملاحظات</th>
+        </tr>
+        </thead>
+        <tbody>
+        @forelse ($salaries as $row)
+            <tr>
+                <td>{{ optional($row->transaction_date)->format('Y-m-d') }}</td>
+                <td>{{ $row->salaryProfile?->name }}</td>
+                <td>{{ $row->transaction_type?->getLabel() }}</td>
+                <td>{{ $service->paymentSourceLabel($row->bankAccount?->name, $row->cashBox?->name) }}</td>
+                <td>{{ filled($row->period_month) && $row->period_month !== '0' ? $row->period_month : '—' }}</td>
+                <td>{{ number_format((float) $row->amount, 3, '.', ',') }}</td>
+                <td>{{ $row->notes }}</td>
+            </tr>
+        @empty
+            <tr><td colspan="7" style="text-align: center;">لا توجد بيانات</td></tr>
+        @endforelse
+        </tbody>
+    </table>
+
+    <h3>الإيجارات</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>التاريخ</th>
+            <th>الإيجار</th>
+            <th>البيان</th>
+            <th>دفعت من</th>
+            <th>عن شهر</th>
+            <th>المبلغ</th>
+            <th>ملاحظات</th>
+        </tr>
+        </thead>
+        <tbody>
+        @forelse ($rents as $row)
+            <tr>
+                <td>{{ optional($row->transaction_date)->format('Y-m-d') }}</td>
+                <td>{{ $row->rentProfile?->name }}</td>
+                <td>{{ $row->transaction_type?->getLabel() }}</td>
+                <td>{{ $service->paymentSourceLabel($row->bankAccount?->name, $row->cashBox?->name) }}</td>
+                <td>{{ filled($row->period_month) && $row->period_month !== '0' ? $row->period_month : '—' }}</td>
+                <td>{{ number_format((float) $row->amount, 3, '.', ',') }}</td>
+                <td>{{ $row->notes }}</td>
+            </tr>
+        @empty
+            <tr><td colspan="7" style="text-align: center;">لا توجد بيانات</td></tr>
+        @endforelse
+        </tbody>
+    </table>
 </div>
 </body>
 </html>

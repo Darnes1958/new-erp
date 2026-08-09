@@ -5,10 +5,14 @@ namespace App\Filament\Market\Resources\CustomerReceipts\Tables;
 use App\Enums\ReceiptTransactionKind;
 use App\Models\CustomerReceipt;
 use App\Services\Payments\CustomerReceiptService;
+use App\Services\Pdf\PaymentReceiptVoucherPdfService;
+use App\Support\PdfDownload;
 use App\Support\ErpNumber;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -94,6 +98,14 @@ class CustomerReceiptsTable
                     }),
             ])
             ->recordActions([
+                Action::make('printVoucher')
+                    ->label('طباعة')
+                    ->icon(Heroicon::OutlinedPrinter)
+                    ->iconButton()
+                    ->color('info')
+                    ->action(fn (CustomerReceipt $record) => PdfDownload::streamed(
+                        app(PaymentReceiptVoucherPdfService::class)->customerReceipt($record),
+                    )),
                 EditAction::make()
                     ->visible(fn (CustomerReceipt $record): bool => Auth::user()?->can('تعديل ايصالات زبائن') || Auth::user()?->is_prog),
                 DeleteAction::make()
