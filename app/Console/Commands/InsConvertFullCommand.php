@@ -48,11 +48,13 @@ class InsConvertFullCommand extends Command
                         '--fresh' => true,
                     ]);
                     $this->line(trim(Artisan::output()));
+                    config(['database.default' => config('erp.central_connection', 'sqlsrv')]);
                 });
             } elseif (! $this->option('skip-migrate')) {
                 $this->runPhase('Company migrations', function () use ($target): void {
                     Artisan::call('erp:migrate-company', ['connection' => $target]);
                     $this->line(trim(Artisan::output()));
+                    config(['database.default' => config('erp.central_connection', 'sqlsrv')]);
                 });
             }
 

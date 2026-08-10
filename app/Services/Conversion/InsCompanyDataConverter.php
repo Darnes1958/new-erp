@@ -215,7 +215,7 @@ class InsCompanyDataConverter
         if (! $row) {
             $this->log("No Customers row found for [{$legacyName}] on [{$this->insCentralConnection()}] — using connection name as display name.");
 
-            DB::connection(config('database.default'))->table('our_companies')->updateOrInsert(
+            DB::connection($this->centralConnection())->table('our_companies')->updateOrInsert(
                 ['connection_name' => $targetName],
                 [
                     'display_name' => $legacyName,
@@ -230,7 +230,7 @@ class InsCompanyDataConverter
             return;
         }
 
-        DB::connection(config('database.default'))->table('our_companies')->updateOrInsert(
+        DB::connection($this->centralConnection())->table('our_companies')->updateOrInsert(
             ['connection_name' => $targetName],
             [
                 'display_name' => $this->stringOrNull($row->CompanyName ?? null) ?? $legacyName,
@@ -264,7 +264,7 @@ class InsCompanyDataConverter
             return;
         }
 
-        DB::connection(config('database.default'))->table('company_settings')->updateOrInsert(
+        DB::connection($this->centralConnection())->table('company_settings')->updateOrInsert(
             ['company' => $this->target],
             [
                 'has_expiry_dates' => false,

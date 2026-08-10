@@ -141,7 +141,7 @@ class CompanyDataConverter
             return;
         }
 
-        DB::connection(config('database.default'))->table('company_settings')->updateOrInsert(
+        DB::connection((string) config('erp.central_connection', 'sqlsrv'))->table('company_settings')->updateOrInsert(
             ['company' => $this->target],
             [
                 'has_expiry_dates' => (bool) ((int) ($row->has_exp ?? 0)),

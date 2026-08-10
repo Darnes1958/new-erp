@@ -45,7 +45,7 @@ class OurCompanyDataConverter
                 continue;
             }
 
-            DB::connection(config('database.default'))->table('our_companies')->updateOrInsert(
+            DB::connection((string) config('erp.central_connection', 'sqlsrv'))->table('our_companies')->updateOrInsert(
                 ['connection_name' => $connectionName],
                 [
                     'display_name' => $this->stringOrNull($row->CompanyName ?? null) ?? $connectionName,
@@ -63,7 +63,7 @@ class OurCompanyDataConverter
 
     protected function assertConnections(): void
     {
-        foreach ([$this->source, config('database.default')] as $connection) {
+        foreach ([$this->source, (string) config('erp.central_connection', 'sqlsrv')] as $connection) {
             if (! config("database.connections.{$connection}")) {
                 throw new RuntimeException("Database connection [{$connection}] is not configured.");
             }

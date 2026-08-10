@@ -72,7 +72,7 @@ class AuthDataConverter
         $this->syncRolePermissions();
 
         if ($replaceCompanyUsers) {
-            DB::table('users')->where('company', $targetCompany)->delete();
+            DB::connection($this->centralConnection())->table('users')->where('company', $targetCompany)->delete();
         }
 
         $userIds = $this->upsertCompanyUsers($legacyCompany, $targetCompany);
@@ -87,7 +87,7 @@ class AuthDataConverter
 
     protected function assertConnections(): void
     {
-        foreach ([$this->source, config('database.default')] as $connection) {
+        foreach ([$this->source, $this->centralConnection()] as $connection) {
             if (! config("database.connections.{$connection}")) {
                 throw new RuntimeException("Database connection [{$connection}] is not configured.");
             }
@@ -100,12 +100,14 @@ class AuthDataConverter
     {
         $this->log('Clearing auth tables in target database...');
 
-        DB::table('role_has_permissions')->delete();
-        DB::table('model_has_roles')->delete();
-        DB::table('model_has_permissions')->delete();
-        DB::table('roles')->delete();
-        DB::table('permissions')->delete();
-        DB::table('users')->delete();
+        $central = $this->central();
+
+        $central->table('role_has_permissions')->delete();
+        $central->table('model_has_roles')->delete();
+        $central->table('model_has_permissions')->delete();
+        $central->table('roles')->delete();
+        $central->table('permissions')->delete();
+        $central->table('users')->delete();
     }
 
     protected function syncRoles(): void
@@ -129,7 +131,7 @@ class AuthDataConverter
         foreach ($rows as $row) {
             $legacyId = (int) $row['id'];
 
-            $existing = DB::table('roles')
+            $existing = $this->central()->table('roles')
                 ->where('name', $row['name'])
                 ->where('guard_name', $row['guard_name'])
                 ->first();
@@ -140,10 +142,10 @@ class AuthDataConverter
                 continue;
             }
 
-            if (DB::table('roles')->where('id', $legacyId)->exists()) {
+            if ($this->central()->table('roles')->where('id', $legacyId)->exists()) {
                 $payload = $row;
                 unset($payload['id']);
-                $this->roleIdMap[$legacyId] = (int) DB::table('roles')->insertGetId($payload);
+                $this->roleIdMap[$legacyId] = (int) $this->central()->table('roles')->insertGetId($payload);
 
                 continue;
             }
@@ -176,7 +178,7 @@ class AuthDataConverter
         foreach ($rows as $row) {
             $legacyId = (int) $row['id'];
 
-            $existing = DB::table('permissions')
+            $existing = $this->central()->table('permissions')
                 ->where('name', $row['name'])
                 ->where('guard_name', $row['guard_name'])
                 ->first();
@@ -187,10 +189,10 @@ class AuthDataConverter
                 continue;
             }
 
-            if (DB::table('permissions')->where('id', $legacyId)->exists()) {
+            if ($this->central()->table('permissions')->where('id', $legacyId)->exists()) {
                 $payload = $row;
                 unset($payload['id']);
-                $this->permissionIdMap[$legacyId] = (int) DB::table('permissions')->insertGetId($payload);
+                $this->permissionIdMap[$legacyId] = (int) $this->central()->table('permissions')->insertGetId($payload);
 
                 continue;
             }
@@ -208,8 +210,8 @@ class AuthDataConverter
             $roleId = $this->mapRoleId((int) $row->role_id);
             $permissionId = $this->mapPermissionId((int) $row->permission_id);
 
-            if (! DB::table('roles')->where('id', $roleId)->exists()
-                || ! DB::table('permissions')->where('id', $permissionId)->exists()) {
+            if (! $this->central()->table('roles')->where('id', $roleId)->exists()
+                || ! $this->central()->table('permissions')->where('id', $permissionId)->exists()) {
                 continue;
             }
 
@@ -218,13 +220,13 @@ class AuthDataConverter
                 'role_id' => $roleId,
             ];
 
-            $exists = DB::table('role_has_permissions')
+            $exists = $this->central()->table('role_has_permissions')
                 ->where('permission_id', $payload['permission_id'])
                 ->where('role_id', $payload['role_id'])
                 ->exists();
 
             if (! $exists) {
-                DB::table('role_has_permissions')->insert($payload);
+                $this->central()->table('role_has_permissions')->insert($payload);
             }
         }
     }
@@ -268,12 +270,12 @@ class AuthDataConverter
             $payload = $this->legacyUserRowToPayload($row, $targetCompany);
             unset($payload['id']);
 
-            $existingById = DB::table('users')->where('id', $id)->exists();
+            $existingById = $this->central()->table('users')->where('id', $id)->exists();
             $existingByEmail = filled($row->email)
-                && DB::table('users')->where('email', $row->email)->exists();
+                && $this->central()->table('users')->where('email', $row->email)->exists();
 
             if ($existingById) {
-                DB::table('users')->where('id', $id)->update($payload);
+                $this->central()->table('users')->where('id', $id)->update($payload);
                 $userIds[] = $id;
 
                 continue;
@@ -285,10 +287,10 @@ class AuthDataConverter
                 continue;
             }
 
-            DB::transaction(function () use ($id, $payload): void {
-                DB::unprepared('SET IDENTITY_INSERT [users] ON');
-                DB::table('users')->insert(['id' => $id, ...$payload]);
-                DB::unprepared('SET IDENTITY_INSERT [users] OFF');
+            $this->central()->transaction(function () use ($id, $payload): void {
+                $this->central()->unprepared('SET IDENTITY_INSERT [users] ON');
+                $this->central()->table('users')->insert(['id' => $id, ...$payload]);
+                $this->central()->unprepared('SET IDENTITY_INSERT [users] OFF');
             });
 
             $userIds[] = $id;
@@ -328,7 +330,7 @@ class AuthDataConverter
         $this->log('Converting user roles...');
 
         $existingRoles = array_fill_keys(
-            DB::table('roles')->pluck('id')->all(),
+            $this->central()->table('roles')->pluck('id')->all(),
             true,
         );
 
@@ -346,7 +348,7 @@ class AuthDataConverter
                 continue;
             }
 
-            $exists = DB::table('model_has_roles')
+            $exists = $this->central()->table('model_has_roles')
                 ->where('role_id', $roleId)
                 ->where('model_type', 'App\\Models\\User')
                 ->where('model_id', $modelId)
@@ -356,7 +358,7 @@ class AuthDataConverter
                 continue;
             }
 
-            DB::table('model_has_roles')->insert([
+            $this->central()->table('model_has_roles')->insert([
                 'role_id' => $roleId,
                 'model_type' => 'App\\Models\\User',
                 'model_id' => $modelId,
@@ -374,7 +376,7 @@ class AuthDataConverter
         $this->log('Converting user permissions...');
 
         $existingPermissions = array_fill_keys(
-            DB::table('permissions')->pluck('id')->all(),
+            $this->central()->table('permissions')->pluck('id')->all(),
             true,
         );
 
@@ -392,7 +394,7 @@ class AuthDataConverter
                 continue;
             }
 
-            $exists = DB::table('model_has_permissions')
+            $exists = $this->central()->table('model_has_permissions')
                 ->where('permission_id', $permissionId)
                 ->where('model_type', 'App\\Models\\User')
                 ->where('model_id', $modelId)
@@ -402,7 +404,7 @@ class AuthDataConverter
                 continue;
             }
 
-            DB::table('model_has_permissions')->insert([
+            $this->central()->table('model_has_permissions')->insert([
                 'permission_id' => $permissionId,
                 'model_type' => 'App\\Models\\User',
                 'model_id' => $modelId,
@@ -430,16 +432,26 @@ class AuthDataConverter
         }
 
         foreach (array_chunk($rows, 100) as $chunk) {
-            DB::transaction(function () use ($table, $chunk): void {
-                DB::unprepared("SET IDENTITY_INSERT [{$table}] ON");
+            $this->central()->transaction(function () use ($table, $chunk): void {
+                $this->central()->unprepared("SET IDENTITY_INSERT [{$table}] ON");
 
                 foreach ($chunk as $row) {
-                    DB::table($table)->insert($row);
+                    $this->central()->table($table)->insert($row);
                 }
 
-                DB::unprepared("SET IDENTITY_INSERT [{$table}] OFF");
+                $this->central()->unprepared("SET IDENTITY_INSERT [{$table}] OFF");
             });
         }
+    }
+
+    protected function centralConnection(): string
+    {
+        return (string) config('erp.central_connection', 'sqlsrv');
+    }
+
+    protected function central(): \Illuminate\Database\Connection
+    {
+        return DB::connection($this->centralConnection());
     }
 
     protected function log(string $message): void
