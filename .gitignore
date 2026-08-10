@@ -26,5 +26,6 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /.cache
+
 /config/database.php
 /config/erp.php
