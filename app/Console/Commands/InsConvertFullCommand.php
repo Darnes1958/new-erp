@@ -36,6 +36,13 @@ class InsConvertFullCommand extends Command
         $resumeFromInstallments = (bool) $this->option('resume');
 
         try {
+            if (! $this->option('skip-migrate')) {
+                $this->runPhase('Company migrations', function () use ($target): void {
+                    Artisan::call('erp:migrate-company', ['connection' => $target]);
+                    $this->line(trim(Artisan::output()));
+                });
+            }
+
             if (! $resumeFromInstallments) {
                 $this->runPhase('Register company', function () use ($legacy, $target): void {
                     $converter = new InsCompanyDataConverter($legacy, $target);
@@ -79,13 +86,6 @@ class InsConvertFullCommand extends Command
                 $count = $metrics->recalculateAll(connection: $target);
                 $this->line("  Recalculated {$count} contract(s).");
             });
-
-            if (! $this->option('skip-migrate')) {
-                $this->runPhase('Company migrations', function () use ($target): void {
-                    Artisan::call('erp:migrate-company', ['connection' => $target]);
-                    $this->line(trim(Artisan::output()));
-                });
-            }
 
             $this->printSummary($legacy, $target);
         } catch (\Throwable $exception) {

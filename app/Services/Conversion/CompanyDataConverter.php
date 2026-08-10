@@ -916,16 +916,18 @@ class CompanyDataConverter
             return;
         }
 
+        $connection = DB::connection($this->target);
+
         foreach (array_chunk($rows, 100) as $chunk) {
-            DB::connection($this->target)->transaction(function () use ($table, $chunk): void {
-                DB::connection($this->target)->unprepared("SET IDENTITY_INSERT [{$table}] ON");
+            $connection->unprepared("SET IDENTITY_INSERT [{$table}] ON");
 
+            try {
                 foreach ($chunk as $row) {
-                    DB::connection($this->target)->table($table)->insert($row);
+                    $connection->table($table)->insert($row);
                 }
-
-                DB::connection($this->target)->unprepared("SET IDENTITY_INSERT [{$table}] OFF");
-            });
+            } finally {
+                $connection->unprepared("SET IDENTITY_INSERT [{$table}] OFF");
+            }
         }
     }
 
