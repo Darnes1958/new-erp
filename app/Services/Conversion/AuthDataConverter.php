@@ -11,6 +11,12 @@ class AuthDataConverter
 {
     protected string $source;
 
+    /** @var array<int, int> */
+    protected array $roleIdMap = [];
+
+    /** @var array<int, int> */
+    protected array $permissionIdMap = [];
+
     public function __construct(
         string $source = 'InsFila',
     ) {
@@ -23,6 +29,8 @@ class AuthDataConverter
     public function convert(bool $fresh = false, ?string $company = null, ?string $targetCompany = null): void
     {
         $this->assertConnections();
+        $this->roleIdMap = [];
+        $this->permissionIdMap = [];
 
         if ($company !== null) {
             $this->convertCompanyUsers(
@@ -116,7 +124,35 @@ class AuthDataConverter
             ])
             ->all();
 
-        $this->insertMissingWithIdentity('roles', $rows);
+        $missing = [];
+
+        foreach ($rows as $row) {
+            $legacyId = (int) $row['id'];
+
+            $existing = DB::table('roles')
+                ->where('name', $row['name'])
+                ->where('guard_name', $row['guard_name'])
+                ->first();
+
+            if ($existing) {
+                $this->roleIdMap[$legacyId] = (int) $existing->id;
+
+                continue;
+            }
+
+            if (DB::table('roles')->where('id', $legacyId)->exists()) {
+                $payload = $row;
+                unset($payload['id']);
+                $this->roleIdMap[$legacyId] = (int) DB::table('roles')->insertGetId($payload);
+
+                continue;
+            }
+
+            $missing[] = $row;
+            $this->roleIdMap[$legacyId] = $legacyId;
+        }
+
+        $this->insertWithIdentity('roles', $missing);
     }
 
     protected function syncPermissions(): void
@@ -135,15 +171,51 @@ class AuthDataConverter
             ])
             ->all();
 
-        $this->insertMissingWithIdentity('permissions', $rows);
+        $missing = [];
+
+        foreach ($rows as $row) {
+            $legacyId = (int) $row['id'];
+
+            $existing = DB::table('permissions')
+                ->where('name', $row['name'])
+                ->where('guard_name', $row['guard_name'])
+                ->first();
+
+            if ($existing) {
+                $this->permissionIdMap[$legacyId] = (int) $existing->id;
+
+                continue;
+            }
+
+            if (DB::table('permissions')->where('id', $legacyId)->exists()) {
+                $payload = $row;
+                unset($payload['id']);
+                $this->permissionIdMap[$legacyId] = (int) DB::table('permissions')->insertGetId($payload);
+
+                continue;
+            }
+
+            $missing[] = $row;
+            $this->permissionIdMap[$legacyId] = $legacyId;
+        }
+
+        $this->insertWithIdentity('permissions', $missing);
     }
 
     protected function syncRolePermissions(): void
     {
         foreach (DB::connection($this->source)->table('role_has_permissions')->get() as $row) {
+            $roleId = $this->mapRoleId((int) $row->role_id);
+            $permissionId = $this->mapPermissionId((int) $row->permission_id);
+
+            if (! DB::table('roles')->where('id', $roleId)->exists()
+                || ! DB::table('permissions')->where('id', $permissionId)->exists()) {
+                continue;
+            }
+
             $payload = [
-                'permission_id' => (int) $row->permission_id,
-                'role_id' => (int) $row->role_id,
+                'permission_id' => $permissionId,
+                'role_id' => $roleId,
             ];
 
             $exists = DB::table('role_has_permissions')
@@ -267,7 +339,7 @@ class AuthDataConverter
                 ->whereIn('model_id', $userIds)
                 ->get() as $row
         ) {
-            $roleId = (int) $row->role_id;
+            $roleId = $this->mapRoleId((int) $row->role_id);
             $modelId = (int) $row->model_id;
 
             if (! isset($existingRoles[$roleId])) {
@@ -313,7 +385,7 @@ class AuthDataConverter
                 ->whereIn('model_id', $userIds)
                 ->get() as $row
         ) {
-            $permissionId = (int) $row->permission_id;
+            $permissionId = $this->mapPermissionId((int) $row->permission_id);
             $modelId = (int) $row->model_id;
 
             if (! isset($existingPermissions[$permissionId])) {
@@ -338,20 +410,14 @@ class AuthDataConverter
         }
     }
 
-    /**
-     * @param  list<array<string, mixed>>  $rows
-     */
-    protected function insertMissingWithIdentity(string $table, array $rows): void
+    protected function mapRoleId(int $legacyId): int
     {
-        $missing = [];
+        return $this->roleIdMap[$legacyId] ?? $legacyId;
+    }
 
-        foreach ($rows as $row) {
-            if (! DB::table($table)->where('id', $row['id'])->exists()) {
-                $missing[] = $row;
-            }
-        }
-
-        $this->insertWithIdentity($table, $missing);
+    protected function mapPermissionId(int $legacyId): int
+    {
+        return $this->permissionIdMap[$legacyId] ?? $legacyId;
     }
 
     /**
