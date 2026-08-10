@@ -18,6 +18,7 @@ class InsConvertFullCommand extends Command
         {--fresh : Drop and recreate target company schema, then convert from scratch}
         {--skip-migrate : Skip erp:migrate-company (schema already up to date)}
         {--skip-fifo : Skip FIFO rebuild (step 07)}
+        {--only-sql : Skip PHP phases and run SQL scripts + FIFO + metrics (resume after SQL failure)}
         {--resume : Resume after a failed run — clears installment tables and re-imports installments + remaining steps}';
 
     protected $description = 'Full INS → ERP conversion in one command (schema, PHP data, SQL scripts, FIFO, metrics)';
@@ -39,52 +40,60 @@ class InsConvertFullCommand extends Command
         }
 
         $resumeFromInstallments = (bool) $this->option('resume');
+        $onlySql = (bool) $this->option('only-sql');
 
         try {
-            if ($this->option('fresh')) {
-                $this->runPhase('Company migrations (fresh)', function () use ($target): void {
-                    Artisan::call('erp:migrate-company', [
-                        'connection' => $target,
-                        '--fresh' => true,
-                    ]);
-                    $this->line(trim(Artisan::output()));
-                    config(['database.default' => config('erp.central_connection', 'sqlsrv')]);
-                });
-            } elseif (! $this->option('skip-migrate')) {
-                $this->runPhase('Company migrations', function () use ($target): void {
-                    Artisan::call('erp:migrate-company', ['connection' => $target]);
-                    $this->line(trim(Artisan::output()));
-                    config(['database.default' => config('erp.central_connection', 'sqlsrv')]);
-                });
+            if (! $onlySql) {
+                if ($this->option('fresh')) {
+                    $this->runPhase('Company migrations (fresh)', function () use ($target): void {
+                        Artisan::call('erp:migrate-company', [
+                            'connection' => $target,
+                            '--fresh' => true,
+                        ]);
+                        $this->line(trim(Artisan::output()));
+                        config(['database.default' => config('erp.central_connection', 'sqlsrv')]);
+                    });
+                } elseif (! $this->option('skip-migrate')) {
+                    $this->runPhase('Company migrations', function () use ($target): void {
+                        Artisan::call('erp:migrate-company', ['connection' => $target]);
+                        $this->line(trim(Artisan::output()));
+                        config(['database.default' => config('erp.central_connection', 'sqlsrv')]);
+                    });
+                }
+
+                if (! $resumeFromInstallments) {
+                    $this->runPhase('Register company', function () use ($legacy, $target): void {
+                        $converter = new InsCompanyDataConverter($legacy, $target);
+                        $converter->convert(only: ['register_company', 'company_settings']);
+                    });
+
+                    $this->runPhase('Core data (PHP)', function () use ($legacy, $target): void {
+                        $converter = new InsCompanyDataConverter($legacy, $target);
+                        $converter->convert(only: [
+                            'payment_methods',
+                            'master',
+                            'items',
+                            'sales',
+                            'installments',
+                            'users',
+                            'created_by',
+                        ]);
+                    });
+                } else {
+                    $this->warn('Resuming from installments — clearing partial installment data first.');
+                    $this->clearInstallmentTables($target);
+
+                    $this->runPhase('Installments (PHP resume)', function () use ($legacy, $target): void {
+                        $converter = new InsCompanyDataConverter($legacy, $target);
+                        $converter->convert(only: ['installments', 'created_by']);
+                    });
+                }
             }
 
-            if (! $resumeFromInstallments) {
-                $this->runPhase('Register company', function () use ($legacy, $target): void {
-                    $converter = new InsCompanyDataConverter($legacy, $target);
-                    $converter->convert(only: ['register_company', 'company_settings']);
-                });
-
-                $this->runPhase('Core data (PHP)', function () use ($legacy, $target): void {
-                    $converter = new InsCompanyDataConverter($legacy, $target);
-                    $converter->convert(only: [
-                        'payment_methods',
-                        'master',
-                        'items',
-                        'sales',
-                        'installments',
-                        'users',
-                        'created_by',
-                    ]);
-                });
-            } else {
-                $this->warn('Resuming from installments — clearing partial installment data first.');
-                $this->clearInstallmentTables($target);
-
-                $this->runPhase('Installments (PHP resume)', function () use ($legacy, $target): void {
-                    $converter = new InsCompanyDataConverter($legacy, $target);
-                    $converter->convert(only: ['installments', 'created_by']);
-                });
-            }
+            $this->runPhase('User empno (SQL prerequisite)', function () use ($legacy, $target): void {
+                $converter = new InsCompanyDataConverter($legacy, $target);
+                $converter->ensureUserEmpnoForSqlScripts();
+            });
 
             $this->runPhase('Extended data (SQL)', function () use ($legacy, $target): void {
                 $runner = new InsSqlConversionRunner($legacy, $target);

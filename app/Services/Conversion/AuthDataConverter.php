@@ -4,6 +4,7 @@ namespace App\Services\Conversion;
 
 use App\Support\Conversion\LegacyConnectionNaming;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -317,7 +318,26 @@ class AuthDataConverter
             'is_prog' => (bool) ($row->is_prog ?? false),
             'created_at' => $row->created_at,
             'updated_at' => $row->updated_at,
+            ...$this->conversionUserColumns($row),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function conversionUserColumns(object $row): array
+    {
+        if (! Schema::connection($this->centralConnection())->hasColumn('users', 'empno')) {
+            return [];
+        }
+
+        $columns = ['old_user_id' => (int) $row->id];
+
+        if (property_exists($row, 'empno') && $row->empno !== null) {
+            $columns['empno'] = (int) $row->empno;
+        }
+
+        return $columns;
     }
 
     /** @param list<int> $userIds */

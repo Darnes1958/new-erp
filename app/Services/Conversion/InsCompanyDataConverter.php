@@ -1094,20 +1094,32 @@ class InsCompanyDataConverter
             return;
         }
 
-        $rows = $legacyUsers->map(fn ($row) => [
-            'id' => (int) $row->id,
-            'name' => $row->name,
-            'email' => $row->email,
-            'email_verified_at' => $row->email_verified_at ?? null,
-            'password' => $row->password,
-            'company' => $this->target,
-            'warehouse_id' => null,
-            'status' => 1,
-            'remember_token' => $row->remember_token ?? null,
-            'is_prog' => false,
-            'created_at' => $row->created_at ?? now(),
-            'updated_at' => $row->updated_at ?? now(),
-        ])->all();
+        $rows = $legacyUsers->map(function ($row) use ($targetCentral) {
+            $payload = [
+                'id' => (int) $row->id,
+                'name' => $row->name,
+                'email' => $row->email,
+                'email_verified_at' => $row->email_verified_at ?? null,
+                'password' => $row->password,
+                'company' => $this->target,
+                'warehouse_id' => null,
+                'status' => 1,
+                'remember_token' => $row->remember_token ?? null,
+                'is_prog' => false,
+                'created_at' => $row->created_at ?? now(),
+                'updated_at' => $row->updated_at ?? now(),
+            ];
+
+            if (Schema::connection($targetCentral)->hasColumn('users', 'empno')) {
+                $payload['old_user_id'] = (int) $row->id;
+
+                if (isset($row->empno) && $row->empno !== null) {
+                    $payload['empno'] = (int) $row->empno;
+                }
+            }
+
+            return $payload;
+        })->all();
 
         foreach (array_chunk($rows, 50) as $chunk) {
             DB::connection($targetCentral)->transaction(function () use ($targetCentral, $chunk): void {
@@ -1148,6 +1160,56 @@ class InsCompanyDataConverter
 
         $this->log('Imported '.count($rows).' user(s) for ['.$this->source.'] → ['.$this->target.'].');
         $this->log('Emp map entries: '.count($this->empToUserId));
+    }
+
+    /**
+     * Backfill empno / old_user_id on central users so SQL conversion scripts can join on empno.
+     */
+    public function ensureUserEmpnoForSqlScripts(): void
+    {
+        $targetCentral = $this->centralConnection();
+        $insCentral = $this->insCentralConnection();
+
+        if (! Schema::connection($targetCentral)->hasColumn('users', 'empno')) {
+            throw new RuntimeException(
+                'Central users table is missing column [empno]. Run central migrations first: php artisan migrate'
+            );
+        }
+
+        if (! Schema::connection($insCentral)->hasColumn('users', 'empno')) {
+            $this->log('Legacy users have no empno column — SQL created_by joins will use fallback user id only.');
+
+            return;
+        }
+
+        $legacyUsers = DB::connection($insCentral)
+            ->table('users')
+            ->where('company', $this->source)
+            ->whereNotNull('empno')
+            ->get(['id', 'email', 'empno']);
+
+        $updated = 0;
+
+        foreach ($legacyUsers as $row) {
+            $targetId = $this->resolveTargetUserId($targetCentral, (int) $row->id, $row->email);
+
+            if ($targetId === null) {
+                continue;
+            }
+
+            DB::connection($targetCentral)
+                ->table('users')
+                ->where('id', $targetId)
+                ->update([
+                    'empno' => (int) $row->empno,
+                    'old_user_id' => (int) $row->id,
+                    'updated_at' => now(),
+                ]);
+
+            $updated++;
+        }
+
+        $this->log("Backfilled empno on {$updated} central user(s) for SQL scripts.");
     }
 
     /**
