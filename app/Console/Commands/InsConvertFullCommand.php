@@ -14,19 +14,24 @@ use Symfony\Component\Process\Process;
 class InsConvertFullCommand extends Command
 {
     protected $signature = 'ins:convert-full
-        {legacy : Legacy INS company connection name (e.g. Elmaleh, BenTaher)}
-        {--skip-migrate : Skip erp:migrate-company (use when schema is already up to date)}
+        {legacy : Legacy INS company connection name (e.g. Elmaleh, BenTaher, Motahedon)}
+        {--fresh : Drop and recreate target company schema, then convert from scratch}
+        {--skip-migrate : Skip erp:migrate-company (schema already up to date)}
         {--skip-fifo : Skip FIFO rebuild (step 07)}
         {--resume : Resume after a failed run — clears installment tables and re-imports installments + remaining steps}';
 
-    protected $description = 'One-command INS → ERP conversion (all steps, any company)';
+    protected $description = 'Full INS → ERP conversion in one command (schema, PHP data, SQL scripts, FIFO, metrics)';
 
     public function handle(InstallmentContractMetricsService $metrics): int
     {
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(0);
+
         $legacy = LegacyConnectionNaming::legacyName((string) $this->argument('legacy'));
         $target = LegacyConnectionNaming::targetName($legacy);
 
         $this->info("INS full conversion: [{$legacy}] → [{$target}]");
+        $this->line('Prerequisite (once per company): erp:convert-auth useradmin --fresh --company='.$legacy.' --target-company='.$target);
         $this->newLine();
 
         if (! $this->assertConnections($legacy, $target)) {
@@ -36,7 +41,15 @@ class InsConvertFullCommand extends Command
         $resumeFromInstallments = (bool) $this->option('resume');
 
         try {
-            if (! $this->option('skip-migrate')) {
+            if ($this->option('fresh')) {
+                $this->runPhase('Company migrations (fresh)', function () use ($target): void {
+                    Artisan::call('erp:migrate-company', [
+                        'connection' => $target,
+                        '--fresh' => true,
+                    ]);
+                    $this->line(trim(Artisan::output()));
+                });
+            } elseif (! $this->option('skip-migrate')) {
                 $this->runPhase('Company migrations', function () use ($target): void {
                     Artisan::call('erp:migrate-company', ['connection' => $target]);
                     $this->line(trim(Artisan::output()));

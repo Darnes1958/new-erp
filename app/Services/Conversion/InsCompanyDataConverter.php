@@ -547,66 +547,84 @@ class InsCompanyDataConverter
             return;
         }
 
-        $invoiceRows = $this->legacyTableOrdered('sells', 'order_no')->map(function ($row) {
-            $grandTotal = (float) ($row->tot ?? 0);
-            $amountPaid = (float) ($row->cash ?? 0);
+        $invoiceCount = 0;
 
-            return [
-                'id' => (int) $row->order_no,
-                'invoice_date' => $row->order_date,
-                'customer_id' => (int) $row->jeha,
-                'payment_method_id' => $this->mapInsPaymentMethodId($row->price_type),
-                'warehouse_id' => $this->resolveInsSalesWarehouseId($row),
-                'is_retail' => true,
-                'lines_subtotal' => $row->tot1 ?? 0,
-                'extra_cost' => $row->tot_charges ?? 0,
-                'rate_markup' => 0,
-                'difference_amount' => 0,
-                'discount' => $row->ksm ?? 0,
-                'grand_total' => $grandTotal,
-                'amount_paid' => $amountPaid,
-                'balance' => max($grandTotal - $amountPaid, 0),
-                'deferred_amount' => $row->not_cash ?? 0,
-                'refund_amount' => 0,
-                'unpaid_date' => null,
-                'notes' => $this->stringOrNull($row->notes ?? null),
-                'created_by' => $this->resolveCreatedBy($row->emp ?? null),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        })->all();
+        DB::connection($this->source)
+            ->table('sells')
+            ->orderBy('order_no')
+            ->chunk(1000, function ($chunk) use (&$invoiceCount): void {
+                $invoiceRows = $chunk->map(function ($row) {
+                    $grandTotal = (float) ($row->tot ?? 0);
+                    $amountPaid = (float) ($row->cash ?? 0);
 
-        $this->insertWithIdentity('sales_invoices', $invoiceRows);
-        $this->log('Converted '.count($invoiceRows).' sales invoice(s).');
+                    return [
+                        'id' => (int) $row->order_no,
+                        'invoice_date' => $row->order_date,
+                        'customer_id' => (int) $row->jeha,
+                        'payment_method_id' => $this->mapInsPaymentMethodId($row->price_type),
+                        'warehouse_id' => $this->resolveInsSalesWarehouseId($row),
+                        'is_retail' => true,
+                        'lines_subtotal' => $row->tot1 ?? 0,
+                        'extra_cost' => $row->tot_charges ?? 0,
+                        'rate_markup' => 0,
+                        'difference_amount' => 0,
+                        'discount' => $row->ksm ?? 0,
+                        'grand_total' => $grandTotal,
+                        'amount_paid' => $amountPaid,
+                        'balance' => max($grandTotal - $amountPaid, 0),
+                        'deferred_amount' => $row->not_cash ?? 0,
+                        'refund_amount' => 0,
+                        'unpaid_date' => null,
+                        'notes' => $this->stringOrNull($row->notes ?? null),
+                        'created_by' => $this->resolveCreatedBy($row->emp ?? null),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                })->all();
+
+                $this->insertWithIdentity('sales_invoices', $invoiceRows);
+                $invoiceCount += count($invoiceRows);
+            });
+
+        $this->log('Converted '.$invoiceCount.' sales invoice(s).');
 
         if (! $this->legacyHasTable('sell_tran')) {
             return;
         }
 
-        $lineRows = $this->legacyTableOrdered('sell_tran', 'rec_no')->map(function ($row) {
-            $qty = (float) ($row->quant ?? 0);
-            $unitPrice = (float) ($row->price ?? 0);
+        $lineCount = 0;
 
-            return [
-                'id' => (int) $row->rec_no,
-                'sales_invoice_id' => (int) $row->order_no,
-                'item_id' => (int) $row->item_no,
-                'barcode' => (string) $row->item_no,
-                'qty_primary' => $qty,
-                'qty_secondary' => 0,
-                'unit_price_primary' => $unitPrice,
-                'unit_price_secondary' => 0,
-                'line_total' => $qty * $unitPrice,
-                'profit' => $row->rebh ?? 0,
-                'sales_return_id' => null,
-                'created_by' => $this->resolveCreatedBy($row->emp ?? null),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        })->all();
+        DB::connection($this->source)
+            ->table('sell_tran')
+            ->orderBy('rec_no')
+            ->chunk(2000, function ($chunk) use (&$lineCount): void {
+                $lineRows = $chunk->map(function ($row) {
+                    $qty = (float) ($row->quant ?? 0);
+                    $unitPrice = (float) ($row->price ?? 0);
 
-        $this->insertWithIdentity('sales_invoice_lines', $lineRows);
-        $this->log('Converted '.count($lineRows).' sales invoice line(s).');
+                    return [
+                        'id' => (int) $row->rec_no,
+                        'sales_invoice_id' => (int) $row->order_no,
+                        'item_id' => (int) $row->item_no,
+                        'barcode' => (string) $row->item_no,
+                        'qty_primary' => $qty,
+                        'qty_secondary' => 0,
+                        'unit_price_primary' => $unitPrice,
+                        'unit_price_secondary' => 0,
+                        'line_total' => $qty * $unitPrice,
+                        'profit' => $row->rebh ?? 0,
+                        'sales_return_id' => null,
+                        'created_by' => $this->resolveCreatedBy($row->emp ?? null),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                })->all();
+
+                $this->insertWithIdentity('sales_invoice_lines', $lineRows);
+                $lineCount += count($lineRows);
+            });
+
+        $this->log('Converted '.$lineCount.' sales invoice line(s).');
     }
 
     protected function convertInstallments(): void
@@ -680,27 +698,55 @@ class InsCompanyDataConverter
         }
 
         if ($this->legacyHasTable('kst_trans')) {
-            $deductions = $this->legacyTableOrdered('kst_trans', 'wrec_no')
-                ->filter(fn ($row) => filled($row->ksm ?? null) && (float) $row->ksm != 0.0)
-                ->map(fn ($row) => $this->mapInsDeductionRow($row))
-                ->all();
-            $this->insertWithIdentity('installment_deductions', $deductions);
-            $this->log('Converted '.count($deductions).' installment deduction(s) (non-zero ksm only).');
+            $deductionCount = 0;
+
+            DB::connection($this->source)
+                ->table('kst_trans')
+                ->orderBy('wrec_no')
+                ->chunk(2000, function ($chunk) use (&$deductionCount): void {
+                    $deductions = $chunk
+                        ->filter(fn ($row) => filled($row->ksm ?? null) && (float) $row->ksm != 0.0)
+                        ->map(fn ($row) => $this->mapInsDeductionRow($row))
+                        ->all();
+
+                    if ($deductions === []) {
+                        return;
+                    }
+
+                    $this->insertWithIdentity('installment_deductions', $deductions);
+                    $deductionCount += count($deductions);
+                });
+
+            $this->log('Converted '.$deductionCount.' installment deduction(s) (non-zero ksm only).');
         }
 
         if ($this->legacyHasTable('TransArc')) {
-            $archivedDeductions = $this->legacyTableOrdered('TransArc', 'wrec_no')
-                ->filter(fn ($row) => filled($row->ksm ?? null) && (float) $row->ksm != 0.0)
-                ->map(function ($row) use ($archiveIdByContractNo) {
-                    $mapped = $this->mapInsDeductionRow($row);
-                    unset($mapped['surplus_id']);
-                    $mapped['installment_contract_id'] = (int) ($archiveIdByContractNo[(int) $row->no] ?? $row->no);
+            $archivedDeductionCount = 0;
 
-                    return $mapped;
-                })
-                ->all();
-            $this->insertWithIdentity('installment_deduction_archives', $archivedDeductions);
-            $this->log('Converted '.count($archivedDeductions).' archived installment deduction(s) (non-zero ksm only).');
+            DB::connection($this->source)
+                ->table('TransArc')
+                ->orderBy('wrec_no')
+                ->chunk(2000, function ($chunk) use ($archiveIdByContractNo, &$archivedDeductionCount): void {
+                    $archivedDeductions = $chunk
+                        ->filter(fn ($row) => filled($row->ksm ?? null) && (float) $row->ksm != 0.0)
+                        ->map(function ($row) use ($archiveIdByContractNo) {
+                            $mapped = $this->mapInsDeductionRow($row);
+                            unset($mapped['surplus_id']);
+                            $mapped['installment_contract_id'] = (int) ($archiveIdByContractNo[(int) $row->no] ?? $row->no);
+
+                            return $mapped;
+                        })
+                        ->all();
+
+                    if ($archivedDeductions === []) {
+                        return;
+                    }
+
+                    $this->insertWithIdentity('installment_deduction_archives', $archivedDeductions);
+                    $archivedDeductionCount += count($archivedDeductions);
+                });
+
+            $this->log('Converted '.$archivedDeductionCount.' archived installment deduction(s) (non-zero ksm only).');
         }
     }
 
