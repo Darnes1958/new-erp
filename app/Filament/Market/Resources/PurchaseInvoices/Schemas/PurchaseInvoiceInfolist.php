@@ -43,24 +43,26 @@ class PurchaseInvoiceInfolist
     protected static function lineTableDefinition(): array
     {
         $tableColumns = [
-            TableColumn::make('الصنف'),
+            TableColumn::make('رقم الصنف'),
+            TableColumn::make('اسم الصنف'),
             TableColumn::make('الكمية'),
         ];
 
         $schema = [
+            TextEntry::make('item_id'),
             TextEntry::make('item.name'),
             TextEntry::make('qty_primary')->numeric(3),
         ];
 
         if (CompanySettings::hasDualUnit()) {
-            $tableColumns[] = TableColumn::make('الكمية 2');
+            $tableColumns[] = TableColumn::make('كمية 2');
             $schema[] = TextEntry::make('qty_secondary')->numeric(3);
         }
 
         $tableColumns[] = TableColumn::make('السعر');
-        $tableColumns[] = TableColumn::make('الإجمالي');
-
         $schema[] = TextEntry::make('unit_cost_primary')->numeric(3);
+
+        $tableColumns[] = TableColumn::make('الإجمالي');
         $schema[] = TextEntry::make('line_cost_total')->numeric(3);
 
         return [$tableColumns, $schema];

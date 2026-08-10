@@ -262,6 +262,9 @@ class WarehouseTransferService
      */
     private function consumeFifoLayers(int $itemId, int $warehouseId, float $qtyPrimary): array
     {
+        $salesInventory = app(SalesInventoryService::class);
+        $salesInventory->ensureFifoLayersForSale($itemId, $warehouseId, $qtyPrimary);
+
         $remainingToAllocate = $qtyPrimary;
         $allocations = [];
 
@@ -296,7 +299,41 @@ class WarehouseTransferService
         }
 
         if ($remainingToAllocate > 0.0001) {
-            throw new RuntimeException('رصيد FIFO للصنف غير كافٍ');
+            $salesInventory->ensureFifoLayersForSale($itemId, $warehouseId, $qtyPrimary);
+
+            $layers = PurchaseInvoiceLine::query()
+                ->where('item_id', $itemId)
+                ->where('remaining_qty_primary', '>', 0)
+                ->whereHas('purchaseInvoice', fn ($query) => $query->where('warehouse_id', $warehouseId))
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($layers as $layer) {
+                if ($remainingToAllocate <= 0.0001) {
+                    break;
+                }
+
+                $available = (float) $layer->remaining_qty_primary;
+                $take = min($available, $remainingToAllocate);
+
+                $layer->update([
+                    'remaining_qty_primary' => $available - $take,
+                ]);
+
+                $allocations[] = [
+                    'source_purchase_invoice_line_id' => (int) $layer->id,
+                    'qty_primary' => $take,
+                    'unit_cost' => (float) $layer->unit_cost_primary,
+                ];
+
+                $remainingToAllocate -= $take;
+            }
+        }
+
+        if ($remainingToAllocate > 0.0001) {
+            throw new RuntimeException('حدث خطأ !! يرجي التواصل مع المبرمج');
         }
 
         return $allocations;

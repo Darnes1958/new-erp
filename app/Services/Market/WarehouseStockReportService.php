@@ -19,7 +19,12 @@ class WarehouseStockReportService
             ->when(
                 ! $includeZero,
                 fn (Builder $query): Builder => $query->where('warehouse_qty_primary', '!=', 0),
-            )
+            );
+    }
+
+    public function applyDefaultOrdering(Builder $query): Builder
+    {
+        return $query
             ->orderBy('item_name')
             ->orderBy('warehouse_name');
     }

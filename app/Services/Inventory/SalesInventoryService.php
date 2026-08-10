@@ -3,6 +3,7 @@
 namespace App\Services\Inventory;
 
 use App\Models\FifoAllocation;
+use App\Models\Item;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseInvoiceLine;
 use App\Models\SalesInvoice;
@@ -10,11 +11,15 @@ use App\Models\SalesInvoiceLine;
 use App\Models\StockMovement;
 use App\Models\WarehouseStock;
 use DateTimeInterface;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class SalesInventoryService
 {
+    private const FIFO_ADJUSTMENT_NOTES = 'تسوية FIFO تلقائية';
+
     public function warehouseStockQty(int $itemId, int $warehouseId): float
     {
         return (float) (WarehouseStock::query()
@@ -32,6 +37,22 @@ class SalesInventoryService
         }
     }
 
+    public function ensureFifoLayersForSale(int $itemId, int $warehouseId, float $qtyPrimary): void
+    {
+        $availableFifo = $this->totalFifoRemaining($itemId);
+
+        if ($availableFifo + 0.0001 >= $qtyPrimary) {
+            return;
+        }
+
+        $this->replenishFifoShortfall($itemId, $warehouseId, $qtyPrimary - $availableFifo);
+    }
+
+    public function restoreMissingFifoQty(int $itemId, int $warehouseId, float $qtyPrimary): void
+    {
+        $this->replenishFifoShortfall($itemId, $warehouseId, $qtyPrimary);
+    }
+
     public function applySalesLine(
         int $itemId,
         int $warehouseId,
@@ -43,18 +64,12 @@ class SalesInventoryService
         ?DateTimeInterface $movementDate = null,
     ): float {
         $this->assertWarehouseStock($itemId, $warehouseId, $qtyPrimary);
+        $this->ensureFifoLayersForSale($itemId, $warehouseId, $qtyPrimary);
 
         $remainingToAllocate = $qtyPrimary;
         $profit = 0.0;
 
-        $layers = PurchaseInvoiceLine::query()
-            ->where('item_id', $itemId)
-            ->where('remaining_qty_primary', '>', 0)
-            ->whereHas('purchaseInvoice', fn ($query) => $query->where('warehouse_id', $warehouseId))
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get();
+        $layers = $this->fifoLayersForSale($itemId, $warehouseId);
 
         foreach ($layers as $layer) {
             if ($remainingToAllocate <= 0.0001) {
@@ -85,7 +100,47 @@ class SalesInventoryService
         }
 
         if ($remainingToAllocate > 0.0001) {
-            throw new RuntimeException('رصيد FIFO للصنف غير كافٍ');
+            $this->replenishFifoShortfall($itemId, $warehouseId, $remainingToAllocate);
+
+            foreach ($this->fifoLayersForSale($itemId, $warehouseId) as $layer) {
+                if ($remainingToAllocate <= 0.0001) {
+                    break;
+                }
+
+                $available = (float) $layer->remaining_qty_primary;
+                $take = min($available, $remainingToAllocate);
+                $unitCost = (float) $layer->unit_cost_primary;
+
+                $layer->update([
+                    'remaining_qty_primary' => $available - $take,
+                ]);
+
+                FifoAllocation::query()->create([
+                    'purchase_invoice_id' => $layer->purchase_invoice_id,
+                    'purchase_invoice_line_id' => $layer->id,
+                    'sales_invoice_id' => $salesInvoiceId,
+                    'sales_invoice_line_id' => $salesInvoiceLineId,
+                    'item_id' => $itemId,
+                    'qty_primary' => $take,
+                    'qty_secondary' => 0,
+                    'unit_cost' => $unitCost,
+                ]);
+
+                $profit += ($unitSellPricePrimary - $unitCost) * $take;
+                $remainingToAllocate -= $take;
+            }
+        }
+
+        if ($remainingToAllocate > 0.0001) {
+            Log::error('FIFO allocation still short after reconciliation', [
+                'item_id' => $itemId,
+                'warehouse_id' => $warehouseId,
+                'shortfall' => $remainingToAllocate,
+                'sales_invoice_id' => $salesInvoiceId,
+                'sales_invoice_line_id' => $salesInvoiceLineId,
+            ]);
+
+            throw new RuntimeException('حدث خطأ !! يرجي التواصل مع المبرمج');
         }
 
         $stock = WarehouseStock::query()->firstOrNew([
@@ -131,7 +186,7 @@ class SalesInventoryService
             return;
         }
 
-        $this->reverseFifoAllocationsForLine($line, $qtyPrimary);
+        $this->reverseFifoAllocationsForLine($line, $warehouseId, $qtyPrimary);
 
         $stock = WarehouseStock::query()->firstOrNew([
             'warehouse_id' => $warehouseId,
@@ -157,8 +212,11 @@ class SalesInventoryService
         ]);
     }
 
-    protected function reverseFifoAllocationsForLine(SalesInvoiceLine $line, float $returnQtyPrimary): void
-    {
+    protected function reverseFifoAllocationsForLine(
+        SalesInvoiceLine $line,
+        int $warehouseId,
+        float $returnQtyPrimary,
+    ): void {
         $remaining = $returnQtyPrimary;
 
         $allocations = FifoAllocation::query()
@@ -195,7 +253,173 @@ class SalesInventoryService
         }
 
         if ($remaining > 0.0001) {
-            throw new RuntimeException('تعذر عكس تخصيص FIFO للصنف '.$line->item_id);
+            $this->replenishFifoShortfall((int) $line->item_id, $warehouseId, $remaining);
+
+            Log::info('Restored FIFO layers after sales reversal without allocations', [
+                'item_id' => $line->item_id,
+                'warehouse_id' => $warehouseId,
+                'qty_primary' => $remaining,
+                'sales_invoice_line_id' => $line->id,
+            ]);
         }
+    }
+
+    protected function replenishFifoShortfall(int $itemId, int $warehouseId, float $shortfall): void
+    {
+        if ($shortfall <= 0.0001) {
+            return;
+        }
+
+        $remaining = $shortfall;
+
+        foreach ([$warehouseId, null] as $preferredWarehouseId) {
+            if ($remaining <= 0.0001) {
+                break;
+            }
+
+            $remaining = $this->restoreDepletedPurchaseLines($itemId, $preferredWarehouseId, $remaining);
+        }
+
+        if ($remaining > 0.0001) {
+            $this->createFifoAdjustmentLine($itemId, $warehouseId, $remaining);
+
+            Log::info('Created automatic FIFO adjustment layer', [
+                'item_id' => $itemId,
+                'warehouse_id' => $warehouseId,
+                'qty_primary' => $remaining,
+            ]);
+        }
+    }
+
+    protected function restoreDepletedPurchaseLines(
+        int $itemId,
+        ?int $warehouseId,
+        float $qtyToRestore,
+    ): float {
+        $remaining = $qtyToRestore;
+
+        $query = PurchaseInvoiceLine::query()
+            ->where('item_id', $itemId)
+            ->whereColumn('remaining_qty_primary', '<', 'qty_primary')
+            ->whereHas('purchaseInvoice')
+            ->with('purchaseInvoice:id,warehouse_id')
+            ->lockForUpdate();
+
+        if ($warehouseId !== null) {
+            $query->whereHas('purchaseInvoice', fn ($builder) => $builder->where('warehouse_id', $warehouseId));
+        }
+
+        /** @var Collection<int, PurchaseInvoiceLine> $lines */
+        $lines = $query->get()->sortByDesc(fn (PurchaseInvoiceLine $line): int => (int) $line->id);
+
+        foreach ($lines as $line) {
+            if ($remaining <= 0.0001) {
+                break;
+            }
+
+            $consumed = (float) $line->qty_primary - (float) $line->remaining_qty_primary;
+
+            if ($consumed <= 0.0001) {
+                continue;
+            }
+
+            $take = min($consumed, $remaining);
+
+            $line->update([
+                'remaining_qty_primary' => (float) $line->remaining_qty_primary + $take,
+            ]);
+
+            $remaining -= $take;
+        }
+
+        return $remaining;
+    }
+
+    protected function createFifoAdjustmentLine(int $itemId, int $warehouseId, float $qtyPrimary): PurchaseInvoiceLine
+    {
+        $item = Item::query()->find($itemId);
+        $unitCost = $this->resolveUnitCostForItem($itemId);
+
+        $invoice = PurchaseInvoice::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('notes', self::FIFO_ADJUSTMENT_NOTES)
+            ->whereDate('invoice_date', today())
+            ->first();
+
+        if (! $invoice) {
+            $invoice = PurchaseInvoice::query()->create([
+                'invoice_date' => today(),
+                'supplier_id' => null,
+                'payment_method_id' => 1,
+                'warehouse_id' => $warehouseId,
+                'lines_subtotal' => 0,
+                'amount_paid' => 0,
+                'balance' => 0,
+                'notes' => self::FIFO_ADJUSTMENT_NOTES,
+                'created_by' => Auth::id(),
+            ]);
+        }
+
+        $line = PurchaseInvoiceLine::query()->create([
+            'purchase_invoice_id' => $invoice->id,
+            'item_id' => $itemId,
+            'barcode' => $item?->barcode,
+            'qty_primary' => $qtyPrimary,
+            'qty_secondary' => 0,
+            'unit_cost_primary' => $unitCost,
+            'line_cost_total' => round($qtyPrimary * $unitCost, 3),
+            'remaining_qty_primary' => $qtyPrimary,
+            'remaining_qty_secondary' => 0,
+            'created_by' => Auth::id(),
+        ]);
+
+        $invoice->recalculateTotals();
+
+        return $line;
+    }
+
+    protected function resolveUnitCostForItem(int $itemId): float
+    {
+        $lastCost = PurchaseInvoiceLine::query()
+            ->where('item_id', $itemId)
+            ->where('unit_cost_primary', '>', 0)
+            ->orderByDesc('id')
+            ->value('unit_cost_primary');
+
+        if ($lastCost !== null && (float) $lastCost > 0) {
+            return (float) $lastCost;
+        }
+
+        return Item::resolveBuyPrice($itemId, 1);
+    }
+
+    protected function totalFifoRemaining(int $itemId): float
+    {
+        return (float) PurchaseInvoiceLine::query()
+            ->where('item_id', $itemId)
+            ->where('remaining_qty_primary', '>', 0)
+            ->sum('remaining_qty_primary');
+    }
+
+    /**
+     * Prefer purchase layers in the sale warehouse, then fall back company-wide.
+     *
+     * @return Collection<int, PurchaseInvoiceLine>
+     */
+    protected function fifoLayersForSale(int $itemId, int $warehouseId): Collection
+    {
+        return PurchaseInvoiceLine::query()
+            ->where('item_id', $itemId)
+            ->where('remaining_qty_primary', '>', 0)
+            ->whereHas('purchaseInvoice')
+            ->with('purchaseInvoice:id,warehouse_id,invoice_date')
+            ->lockForUpdate()
+            ->get()
+            ->sortBy([
+                fn (PurchaseInvoiceLine $line): int => (int) $line->purchaseInvoice?->warehouse_id === $warehouseId ? 0 : 1,
+                fn (PurchaseInvoiceLine $line) => (string) ($line->purchaseInvoice?->invoice_date ?? ''),
+                fn (PurchaseInvoiceLine $line): int => (int) $line->id,
+            ])
+            ->values();
     }
 }

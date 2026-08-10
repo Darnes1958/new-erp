@@ -49,7 +49,7 @@ class SalesReturnService
         $newLineTotal = round(max(0, (float) $line->line_total - $returnTotal), 3);
         $newProfit = $oldQty > 0 ? round($oldProfit * ($newQty / $oldQty), 3) : 0;
 
-        $this->reverseFifoAllocations($line, $returnQtyPrimary);
+        $this->reverseFifoAllocations($line, $returnQtyPrimary, (int) $invoice->warehouse_id);
 
         $salesReturn = SalesReturn::query()->create([
             'sales_invoice_id' => $invoice->id,
@@ -137,8 +137,11 @@ class SalesReturnService
         SystemOperationLogger::cancelled(SystemOperationType::SALE_RETURN, $invoiceId, $context);
     }
 
-    protected function reverseFifoAllocations(SalesInvoiceLine $line, float $returnQtyPrimary): void
-    {
+    protected function reverseFifoAllocations(
+        SalesInvoiceLine $line,
+        float $returnQtyPrimary,
+        int $warehouseId,
+    ): void {
         $remaining = $returnQtyPrimary;
 
         $allocations = FifoAllocation::query()
@@ -175,7 +178,11 @@ class SalesReturnService
         }
 
         if ($remaining > 0.0001) {
-            throw new RuntimeException('تعذر عكس تخصيص FIFO للصنف '.$line->item_id);
+            app(SalesInventoryService::class)->restoreMissingFifoQty(
+                (int) $line->item_id,
+                $warehouseId,
+                $remaining,
+            );
         }
     }
 

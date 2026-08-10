@@ -25,7 +25,16 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
      */
     public function getConnectionName(): ?string
     {
-        return config('database.default');
+        return (string) config('erp.central_connection', config('database.default'));
+    }
+
+    public function can($ability, $arguments = []): bool
+    {
+        if ((bool) $this->is_prog || $this->hasRole('admin')) {
+            return true;
+        }
+
+        return parent::can($ability, $arguments);
     }
 
     public function canAccessPanel(Panel $panel): bool

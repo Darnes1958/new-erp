@@ -196,7 +196,7 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
                     ->numeric(3)
                     ->sortable(),
             ])
-            ->defaultSort('item_name')
+            ->defaultSort(fn ($query) => app(WarehouseStockReportService::class)->applyDefaultOrdering($query))
             ->emptyStateHeading('لا توجد بيانات')
             ->paginated([10, 25, 50, 100])
             ->striped();
@@ -212,7 +212,9 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
 
     protected function buildExportQuery(): Builder
     {
-        return $this->buildReportQuery();
+        return app(WarehouseStockReportService::class)->applyDefaultOrdering(
+            $this->buildReportQuery(),
+        );
     }
 
     protected function validateReportFilters(): bool

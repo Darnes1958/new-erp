@@ -100,6 +100,22 @@ class MarketPanelProvider extends PanelProvider
                             gap: 0.25rem;
                             direction: ltr;
                         }
+
+                        .purchase-invoices-table .fi-ta-record-content-ctn {
+                            flex-wrap: wrap;
+                            align-items: flex-start !important;
+                        }
+
+                        .purchase-invoices-table .fi-ta-record-content-ctn > div:first-child {
+                            flex: 1 1 auto;
+                            min-width: 0;
+                        }
+
+                        .purchase-invoices-table .fi-ta-record-content.fi-collapsible {
+                            flex: 1 0 100%;
+                            width: 100%;
+                            max-width: 100%;
+                        }
                     </style>
                     HTML,
             );
