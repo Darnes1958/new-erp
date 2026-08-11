@@ -180,7 +180,14 @@ trait InteractsWithSalesEntry
 
         $stock = app(SalesInventoryService::class)->warehouseStockQty($itemId, $warehouseId);
 
-        if ($stock <= 0) {
+        $existing = SalesInvoiceLineWork::query()
+            ->where('sales_invoice_work_id', Auth::id())
+            ->where('item_id', $itemId)
+            ->first();
+
+        $availableStock = $stock + (float) ($existing?->qty_primary ?? 0);
+
+        if ($availableStock <= 0) {
             Notification::make()->title('الصنف غير مخزون في نقطة البيع هذه')->warning()->send();
 
             return;
@@ -189,14 +196,9 @@ trait InteractsWithSalesEntry
         $item = Item::query()->findOrFail($itemId);
         $unitPrice = $item->sellPriceFor($this->currentPaymentMethodId()) ?? 0;
 
-        $existing = SalesInvoiceLineWork::query()
-            ->where('sales_invoice_work_id', Auth::id())
-            ->where('item_id', $itemId)
-            ->first();
-
         if ($existing) {
             $this->lineForm->fill(array_merge($existing->toArray(), [
-                'stock_display' => $stock,
+                'stock_display' => $availableStock,
             ]));
 
             $this->focusAfterItemResolved((float) $existing->unit_price_primary);
@@ -279,7 +281,17 @@ trait InteractsWithSalesEntry
         }
 
         try {
-            $inventory->assertWarehouseStock((int) $data['item_id'], $warehouseId, (float) $data['qty_primary']);
+            $existingLine = SalesInvoiceLineWork::query()
+                ->where('sales_invoice_work_id', Auth::id())
+                ->where('item_id', (int) $data['item_id'])
+                ->first();
+
+            $existingQty = (float) ($existingLine?->qty_primary ?? 0);
+            $available = $inventory->warehouseStockQty((int) $data['item_id'], $warehouseId) + $existingQty;
+
+            if ($available + 0.0001 < (float) $data['qty_primary']) {
+                throw new \RuntimeException('الرصيد لا يسمح');
+            }
         } catch (\RuntimeException $exception) {
             Notification::make()->title($exception->getMessage())->warning()->send();
 
@@ -351,12 +363,14 @@ trait InteractsWithSalesEntry
                 Action::make('edit_line')
                     ->action(function (SalesInvoiceLineWork $record): void {
                         $warehouseId = $this->currentWarehouseId();
-                        $stock = $warehouseId
-                            ? app(SalesInventoryService::class)->warehouseStockQty((int) $record->item_id, $warehouseId)
+                        $inventory = app(SalesInventoryService::class);
+                        $warehouseStock = $warehouseId
+                            ? $inventory->warehouseStockQty((int) $record->item_id, $warehouseId)
                             : 0;
+                        $lineQty = (float) $record->qty_primary;
 
                         $this->lineForm->fill(array_merge($record->toArray(), [
-                            'stock_display' => $stock,
+                            'stock_display' => $warehouseStock + $lineQty,
                         ]));
 
                         $this->dispatch('focus-field', field: 'qty_primary');

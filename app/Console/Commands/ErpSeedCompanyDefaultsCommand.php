@@ -4,21 +4,31 @@ namespace App\Console\Commands;
 
 use App\Services\Company\CompanyDefaultsSeeder;
 use App\Support\CompanyConnections;
+use App\Support\Conversion\LegacyConnectionNaming;
 use Illuminate\Console\Command;
 
 class ErpSeedCompanyDefaultsCommand extends Command
 {
     protected $signature = 'erp:seed-company-defaults
-        {connection : Company database connection name (e.g. MyCompany_erp)}
+        {connection? : Company database connection (e.g. Ekteyar or Ekteyar_erp)}
+        {--connection= : Same as the connection argument (safer in Plesk / Windows shells)}
         {--register-central : Also register the company in our_companies + company_settings}
-        {--display-name= : Display name for our_companies (defaults to connection without _erp suffix)}
+        {--display-name= : Display name for our_companies. Use underscores instead of spaces in shells that split Arabic text (e.g. الاختيار_الذكي)}
         {--force : Update existing default rows instead of skipping them}';
 
     protected $description = 'Seed default master data for a new empty ERP company (payment methods, customer/supplier, warehouses, units, cash/bank)';
 
     public function handle(CompanyDefaultsSeeder $seeder): int
     {
-        $connection = (string) $this->argument('connection');
+        $connection = $this->resolveConnection();
+
+        if ($connection === null) {
+            $this->error('Missing company connection. Example:');
+            $this->line('  php artisan erp:seed-company-defaults Ekteyar_erp --register-central --display-name=الاختيار_الذكي');
+            $this->line('  php artisan erp:seed-company-defaults --connection=Ekteyar_erp --register-central --display-name=الاختيار_الذكي');
+
+            return self::FAILURE;
+        }
 
         if (! config("database.connections.{$connection}")) {
             $this->error("Database connection [{$connection}] is not configured in config/database.php.");
@@ -40,8 +50,7 @@ class ErpSeedCompanyDefaultsCommand extends Command
         }
 
         if ((bool) $this->option('register-central')) {
-            $displayName = $this->option('display-name');
-            $displayName = is_string($displayName) && $displayName !== '' ? $displayName : null;
+            $displayName = $this->resolveDisplayName();
 
             $seeder->registerCentral($connection, $displayName);
             $this->info('Registered company in central database (our_companies + company_settings).');
@@ -70,5 +79,45 @@ class ErpSeedCompanyDefaultsCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    protected function resolveConnection(): ?string
+    {
+        $connection = $this->argument('connection') ?? $this->option('connection');
+        $connection = is_string($connection) ? trim($connection) : '';
+
+        if ($connection === '') {
+            return null;
+        }
+
+        if (config("database.connections.{$connection}")) {
+            return $connection;
+        }
+
+        $target = LegacyConnectionNaming::targetName($connection);
+
+        if ($target !== $connection && config("database.connections.{$target}")) {
+            $this->line("Using connection [{$target}] for company [{$connection}].");
+
+            return $target;
+        }
+
+        return $connection;
+    }
+
+    protected function resolveDisplayName(): ?string
+    {
+        $displayName = $this->option('display-name');
+        $displayName = is_string($displayName) ? trim($displayName) : '';
+
+        if ($displayName === '') {
+            return null;
+        }
+
+        if (! str_contains($displayName, ' ') && str_contains($displayName, '_')) {
+            $displayName = str_replace('_', ' ', $displayName);
+        }
+
+        return $displayName;
     }
 }

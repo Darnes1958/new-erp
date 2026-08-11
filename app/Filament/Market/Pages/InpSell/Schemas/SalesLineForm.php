@@ -44,6 +44,7 @@ class SalesLineForm
                         modifyQueryUsing: fn (Builder $query) => SalesItemAvailability::applyWarehouseStockFilter(
                             $query,
                             $page->currentWarehouseId(),
+                            filled($page->lineData['item_id'] ?? null) ? (int) $page->lineData['item_id'] : null,
                         ),
                     )
                     ->live()
