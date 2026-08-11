@@ -57,6 +57,7 @@ class OurCompanyForm
                     ->disk('public')
                     ->directory('company-logos')
                     ->visibility('public')
+                    ->fetchFileInformation(false)
                     ->columnSpanFull(),
                 Toggle::make('is_active')
                     ->label('نشطة')

@@ -37,6 +37,7 @@ class UserForm
                     ->disk('public')
                     ->directory('user-avatars')
                     ->visibility('public')
+                    ->fetchFileInformation(false)
                     ->avatar()
                     ->columnSpanFull(),
                 TextInput::make('password')

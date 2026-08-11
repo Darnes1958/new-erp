@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
-use Filament\Models\Contracts\FilamentUser;
+use App\Support\PublicStorageUrl;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -56,7 +56,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
             return null;
         }
 
-        return \Illuminate\Support\Facades\Storage::disk('public')->url($this->avatar_path);
+        return PublicStorageUrl::url($this->avatar_path);
     }
 
     protected function casts(): array

@@ -6,7 +6,6 @@ use App\Models\OurCompany;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class DashboardPresentation
 {
@@ -60,7 +59,7 @@ class DashboardPresentation
             return null;
         }
 
-        return Storage::disk('public')->url($user->avatar_path);
+        return PublicStorageUrl::url($user->avatar_path);
     }
 
     public static function companyLogoUrl(?OurCompany $company = null): ?string
@@ -71,7 +70,7 @@ class DashboardPresentation
             return null;
         }
 
-        return Storage::disk('public')->url($company->logo_path);
+        return PublicStorageUrl::url($company->logo_path);
     }
 
     /**
