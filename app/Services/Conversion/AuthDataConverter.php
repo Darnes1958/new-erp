@@ -3,6 +3,7 @@
 namespace App\Services\Conversion;
 
 use App\Support\Conversion\LegacyConnectionNaming;
+use App\Support\Conversion\LegacyUserStatusResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use RuntimeException;
@@ -18,10 +19,13 @@ class AuthDataConverter
     /** @var array<int, int> */
     protected array $permissionIdMap = [];
 
+    protected LegacyUserStatusResolver $userStatusResolver;
+
     public function __construct(
         string $source = 'InsFila',
     ) {
         $this->source = $source;
+        $this->userStatusResolver = LegacyUserStatusResolver::forConnection($source);
     }
 
     /**
@@ -313,7 +317,7 @@ class AuthDataConverter
             'password' => $row->password,
             'company' => $company,
             'warehouse_id' => $row->place_id ?? null,
-            'status' => $row->status ?? 1,
+            'status' => $this->userStatusResolver->resolve($row),
             'remember_token' => $row->remember_token,
             'is_prog' => (bool) ($row->is_prog ?? false),
             'created_at' => $row->created_at,

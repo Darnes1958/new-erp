@@ -61,7 +61,19 @@ SELECT
     lu.password,
     @TargetCompany,
     NULL,
-    1,
+    CASE
+        WHEN lu.banned_at IS NOT NULL
+            OR EXISTS (
+                SELECT 1
+                FROM useradmin.dbo.bans AS b
+                WHERE b.bannable_type = N'App\Models\User'
+                  AND b.bannable_id = lu.id
+                  AND b.deleted_at IS NULL
+                  AND (b.expired_at IS NULL OR b.expired_at > GETDATE())
+            )
+            THEN 0
+        ELSE 1
+    END,
     0,
     lu.remember_token,
     lu.created_at,
@@ -82,3 +94,26 @@ WHERE lu.company = @LegacyCompany
       WHERE eu.company = @TargetCompany
         AND eu.empno = lu.empno
   );
+
+-- 3) Sync status from useradmin bans / banned_at for users already imported
+UPDATE eu
+SET
+    eu.status = CASE
+        WHEN lu.banned_at IS NOT NULL
+            OR EXISTS (
+                SELECT 1
+                FROM useradmin.dbo.bans AS b
+                WHERE b.bannable_type = N'App\Models\User'
+                  AND b.bannable_id = lu.id
+                  AND b.deleted_at IS NULL
+                  AND (b.expired_at IS NULL OR b.expired_at > GETDATE())
+            )
+            THEN 0
+        ELSE 1
+    END,
+    eu.updated_at = GETDATE()
+FROM new_erp.dbo.users AS eu
+INNER JOIN useradmin.dbo.users AS lu
+    ON lu.id = eu.old_user_id
+    AND lu.company = @LegacyCompany
+WHERE eu.company = @TargetCompany;

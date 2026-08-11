@@ -17,6 +17,9 @@
 | Email was not meaningful in INS — duplicate emails get legacy id appended
 | (e.g. nuri@yahoo.com → nuri10020@yahoo.com) to satisfy unique index.
 |
+| status: 0 when useradmin.bans has an active ban (deleted_at IS NULL and not
+| expired) or users.banned_at IS NOT NULL; otherwise 1.
+|
 | Verify:
 |   SELECT id, old_user_id, empno, company, name, email
 |   FROM new_erp.dbo.users WHERE company = @TargetCompany ORDER BY empno;
@@ -61,7 +64,19 @@ SELECT
     lu.password,
     @TargetCompany,
     NULL,
-    1,
+    CASE
+        WHEN lu.banned_at IS NOT NULL
+            OR EXISTS (
+                SELECT 1
+                FROM useradmin.dbo.bans AS b
+                WHERE b.bannable_type = N'App\Models\User'
+                  AND b.bannable_id = lu.id
+                  AND b.deleted_at IS NULL
+                  AND (b.expired_at IS NULL OR b.expired_at > GETDATE())
+            )
+            THEN 0
+        ELSE 1
+    END,
     0,
     lu.remember_token,
     lu.created_at,

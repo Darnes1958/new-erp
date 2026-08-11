@@ -7,6 +7,7 @@ use App\Services\Conversion\Concerns\MapsLegacyEmpToUserId;
 use App\Support\Conversion\LegacyConnectionNaming;
 use App\Support\Conversion\LegacySchemaDetector;
 use App\Support\Conversion\LegacySchemaKind;
+use App\Support\Conversion\LegacyUserStatusResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -1094,7 +1095,9 @@ class InsCompanyDataConverter
             return;
         }
 
-        $rows = $legacyUsers->map(function ($row) use ($targetCentral) {
+        $userStatusResolver = LegacyUserStatusResolver::forConnection($central);
+
+        $rows = $legacyUsers->map(function ($row) use ($targetCentral, $userStatusResolver) {
             $payload = [
                 'id' => (int) $row->id,
                 'name' => $row->name,
@@ -1103,7 +1106,7 @@ class InsCompanyDataConverter
                 'password' => $row->password,
                 'company' => $this->target,
                 'warehouse_id' => null,
-                'status' => 1,
+                'status' => $userStatusResolver->resolve($row),
                 'remember_token' => $row->remember_token ?? null,
                 'is_prog' => false,
                 'created_at' => $row->created_at ?? now(),
