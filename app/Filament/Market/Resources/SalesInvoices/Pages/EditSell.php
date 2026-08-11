@@ -198,6 +198,10 @@ class EditSell extends Page implements HasSchemas, HasTable
             ->where('sales_invoice_work_id', Auth::id())
             ->get();
 
+        if (! $this->assertWorkHasAtLeastOneLine()) {
+            return;
+        }
+
         try {
             $error = app(SalesInvoiceUpdateService::class)->updateFromWork(
                 $this->invoice->fresh(),

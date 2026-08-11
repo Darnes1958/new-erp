@@ -27,7 +27,7 @@ final class SalesItemAvailability
                 ->select('item_id'));
 
             if ($alwaysIncludeItemId) {
-                $inner->orWhereKey($alwaysIncludeItemId);
+                $inner->orWhere($inner->getModel()->getQualifiedKeyName(), $alwaysIncludeItemId);
             }
         });
     }

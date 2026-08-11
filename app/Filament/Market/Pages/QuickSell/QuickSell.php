@@ -108,7 +108,7 @@ class QuickSell extends Page implements HasSchemas, HasTable
             ->get();
 
         if ($lines->isEmpty()) {
-            Notification::make()->title('لم يتم ادخال اصناف')->warning()->send();
+            Notification::make()->title('يجب أن تحتوي الفاتورة على صنف واحد على الأقل')->warning()->send();
 
             return;
         }

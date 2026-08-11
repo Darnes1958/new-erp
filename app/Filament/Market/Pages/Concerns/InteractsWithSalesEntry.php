@@ -330,6 +330,27 @@ trait InteractsWithSalesEntry
         $this->refreshPaymentTotals();
     }
 
+    protected function workLineCount(): int
+    {
+        return SalesInvoiceLineWork::query()
+            ->where('sales_invoice_work_id', Auth::id())
+            ->count();
+    }
+
+    protected function assertWorkHasAtLeastOneLine(): bool
+    {
+        if ($this->workLineCount() > 0) {
+            return true;
+        }
+
+        Notification::make()
+            ->title('يجب أن تحتوي الفاتورة على صنف واحد على الأقل')
+            ->warning()
+            ->send();
+
+        return false;
+    }
+
     public function table(Table $table): Table
     {
         return $table
@@ -379,20 +400,31 @@ trait InteractsWithSalesEntry
                     ->iconButton()
                     ->color('info')
                     ->hiddenLabel(),
-                Action::make('delete')
+                Action::make('remove_line')
+                    ->label('إلغاء الصنف')
                     ->action(function (SalesInvoiceLineWork $record): void {
+                        $deletedItemId = (int) $record->item_id;
                         $record->delete();
                         $this->recalculateTotals();
-                        $this->lineForm->fill([]);
+
+                        if ((int) ($this->lineData['item_id'] ?? 0) === $deletedItemId) {
+                            $this->lineForm->fill([]);
+                        }
+
+                        Notification::make()
+                            ->title('تم إلغاء الصنف من الفاتورة')
+                            ->success()
+                            ->send();
                     })
                     ->icon('heroicon-m-trash')
                     ->iconButton()
                     ->color('danger')
                     ->hiddenLabel()
-                    ->hidden(fn (): bool => SalesInvoiceLineWork::query()
-                        ->where('sales_invoice_work_id', Auth::id())
-                        ->count() <= 1)
-                    ->requiresConfirmation(),
+                    ->requiresConfirmation()
+                    ->modalHeading('إلغاء الصنف')
+                    ->modalDescription('هل تريد إزالة هذا الصنف من الفاتورة؟')
+                    ->modalSubmitActionLabel('إلغاء الصنف')
+                    ->modalCancelActionLabel('تراجع'),
             ])
             ->emptyStateHeading('لم يتم ادخال اصناف')
             ->striped();

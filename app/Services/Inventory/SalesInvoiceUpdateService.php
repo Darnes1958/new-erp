@@ -26,7 +26,7 @@ class SalesInvoiceUpdateService
         ?int $bankAccountId = null,
     ): ?string {
         if ($workLines->isEmpty()) {
-            return 'لم يتم ادخال اصناف';
+            return 'يجب أن تحتوي الفاتورة على صنف واحد على الأقل';
         }
 
         if ($workLines->contains(fn (SalesInvoiceLineWork $line): bool => (float) $line->unit_price_primary <= 0)) {
