@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DatabaseBackupController;
 use App\Http\Controllers\InvoicePdfController;
+use App\Http\Controllers\PublicMediaController;
 use App\Http\Controllers\WarehouseTransferPdfController;
 use App\Support\FilamentLogin;
 use Filament\Facades\Filament;
@@ -16,6 +17,10 @@ Route::get('/', function () {
 });
 
 Route::redirect('/login', '/market/login')->name('login');
+
+Route::get('/media/{path}', PublicMediaController::class)
+    ->where('path', '.*')
+    ->name('media.public');
 
 Route::middleware('auth')->group(function (): void {
     Route::get('/backup/company', DatabaseBackupController::class)

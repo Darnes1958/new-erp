@@ -2,8 +2,6 @@
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\Storage;
-
 class PublicStorageUrl
 {
     public static function url(?string $path): ?string
@@ -12,6 +10,9 @@ class PublicStorageUrl
             return null;
         }
 
-        return Storage::disk('public')->url($path);
+        $path = ltrim(str_replace('\\', '/', $path), '/');
+        $base = rtrim((string) config('filesystems.disks.public.url', '/media'), '/');
+
+        return "{$base}/{$path}";
     }
 }
