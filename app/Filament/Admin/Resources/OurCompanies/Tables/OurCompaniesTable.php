@@ -16,6 +16,11 @@ class OurCompaniesTable
     {
         return $table
             ->columns([
+                ImageColumn::make('logo_path')
+                    ->label('الشعار')
+                    ->disk('public')
+                    ->imageSize(44)
+                    ->checkFileExistence(false),
                 TextColumn::make('connection_name')
                     ->label('الاتصال')
                     ->sortable()
@@ -26,14 +31,10 @@ class OurCompaniesTable
                     ->sortable(),
                 TextColumn::make('display_name_suffix')
                     ->label('اللاحقة')
-                    ->wrap()
-                    ->toggleable(),
+                    ->limit(40)
+                    ->tooltip(fn (?string $state): ?string => $state),
                 TextColumn::make('comp_code')
                     ->label('الرمز')
-                    ->toggleable(isToggledHiddenByDefault: true),
-                ImageColumn::make('logo_path')
-                    ->label('الشعار')
-                    ->disk('public')
                     ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')
                     ->label('نشطة')

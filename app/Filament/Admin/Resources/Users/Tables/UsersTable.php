@@ -6,6 +6,7 @@ use App\Models\User;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +20,7 @@ class UsersTable
         return $table
             ->modifyQueryUsing(function (Builder $query): Builder {
                 return $query
+                    ->with(['roles', 'permissions'])
                     ->where('company', Auth::user()?->company)
                     ->where('is_prog', false);
             })
@@ -26,6 +28,12 @@ class UsersTable
                 TextColumn::make('id')
                     ->label('الرقم')
                     ->sortable(),
+                ImageColumn::make('avatar_path')
+                    ->label('الصورة')
+                    ->disk('public')
+                    ->circular()
+                    ->imageSize(40)
+                    ->checkFileExistence(false),
                 TextColumn::make('name')
                     ->label('الاسم')
                     ->searchable()
@@ -35,7 +43,14 @@ class UsersTable
                     ->searchable(),
                 TextColumn::make('roles.name')
                     ->label('الأدوار')
-                    ->badge(),
+                    ->badge()
+                    ->limitList(2)
+                    ->expandableLimitedList(),
+                TextColumn::make('permissions.name')
+                    ->label('الصلاحيات')
+                    ->badge()
+                    ->limitList(3)
+                    ->expandableLimitedList(),
                 IconColumn::make('status')
                     ->label('الحالة')
                     ->boolean(),
