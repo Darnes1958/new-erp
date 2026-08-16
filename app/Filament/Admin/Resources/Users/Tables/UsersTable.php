@@ -3,8 +3,11 @@
 namespace App\Filament\Admin\Resources\Users\Tables;
 
 use App\Models\User;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -72,6 +75,39 @@ class UsersTable
             ])
             ->recordActions([
                 EditAction::make()->iconButton(),
+                Action::make('changePassword')
+                    ->label('تغيير كلمة المرور')
+                    ->icon('heroicon-o-key')
+                    ->iconButton()
+                    ->color('warning')
+                    ->modalHeading('تغيير كلمة المرور')
+                    ->modalSubmitActionLabel('حفظ')
+                    ->visible(fn (): bool => (bool) Auth::user()?->is_prog)
+                    ->schema([
+                        TextInput::make('password')
+                            ->label('كلمة المرور الجديدة')
+                            ->password()
+                            ->revealable()
+                            ->required()
+                            ->minLength(8)
+                            ->confirmed(),
+                        TextInput::make('password_confirmation')
+                            ->label('تأكيد كلمة المرور')
+                            ->password()
+                            ->revealable()
+                            ->required()
+                            ->minLength(8),
+                    ])
+                    ->action(function (User $record, array $data): void {
+                        $record->update([
+                            'password' => $data['password'],
+                        ]);
+
+                        Notification::make()
+                            ->title('تم تغيير كلمة المرور')
+                            ->success()
+                            ->send();
+                    }),
                 DeleteAction::make()->iconButton(),
             ]);
     }
