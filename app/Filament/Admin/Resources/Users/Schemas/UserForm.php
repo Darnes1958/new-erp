@@ -95,7 +95,7 @@ class UserForm
                     ->searchable()
                     ->preload(),
                 Toggle::make('is_prog')
-                    ->label('مدير نظام')
+                    ->label('مبرمج')
                     ->default(false)
                     ->visible(fn (): bool => (bool) Auth::user()?->is_prog),
                 Radio::make('status')

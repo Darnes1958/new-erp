@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\EditProfile;
 use App\Support\DashboardWidgets;
 use App\Http\Middleware\FilamentAuthenticate;
 use App\Http\Middleware\FilamentAuthenticateSession;
@@ -32,6 +33,7 @@ class FinancePanelProvider extends PanelProvider
             ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth('full')
             ->breadcrumbs(false)
+            ->profile(EditProfile::class)
             ->colors([
                 'primary' => Color::Violet,
             ])

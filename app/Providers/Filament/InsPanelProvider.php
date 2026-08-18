@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\EditProfile;
 use App\Http\Middleware\FilamentAuthenticate;
 use App\Http\Middleware\FilamentAuthenticateSession;
 use App\Support\DashboardWidgets;
@@ -32,6 +33,7 @@ class InsPanelProvider extends PanelProvider
             ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth('full')
             ->breadcrumbs(false)
+            ->profile(EditProfile::class)
             ->colors([
                 'primary' => Color::Amber,
             ])
