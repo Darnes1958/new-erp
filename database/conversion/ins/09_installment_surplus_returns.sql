@@ -16,6 +16,7 @@
 |
 | IDs:
 |   wrong_kst.wrong_no  → wrong_deductions.id
+|     (duplicate wrong_no → keep first wrec_no as wrong_no; extras use 800000+wrec_no)
 |   over_kst.wrec_no    → installment_surplus.id
 |   over_kst_a.wrec_no  → installment_surplus_archives.id
 |   tar_kst.wrec_no     → installment_suspended.id
@@ -43,6 +44,16 @@ DECLARE @FallbackUserId BIGINT = (
 -- ---------------------------------------------------------------------------
 SET IDENTITY_INSERT BenTaher_erp.dbo.wrong_deductions ON;
 
+;WITH wrong_kst_ranked AS (
+    SELECT
+        w.*,
+        CASE
+            WHEN w.wrec_no = MIN(w.wrec_no) OVER (PARTITION BY w.wrong_no)
+                THEN CAST(w.wrong_no AS BIGINT)
+            ELSE 800000 + CAST(w.wrec_no AS BIGINT)
+        END AS mapped_id
+    FROM BenTaher.dbo.wrong_kst AS w
+)
 INSERT INTO BenTaher_erp.dbo.wrong_deductions (
     id,
     payroll_bank_id,
@@ -58,7 +69,7 @@ INSERT INTO BenTaher_erp.dbo.wrong_deductions (
     updated_at
 )
 SELECT
-    CAST(w.wrong_no AS BIGINT),
+    w.mapped_id,
     b.bank_tajmeeh,
     w.acc,
     w.name,
@@ -81,15 +92,19 @@ SELECT
     COALESCE(u.id, @FallbackUserId),
     COALESCE(w.inp_date, w.tar_date, GETDATE()),
     COALESCE(w.inp_date, w.tar_date, GETDATE())
-FROM BenTaher.dbo.wrong_kst AS w
+FROM wrong_kst_ranked AS w
 LEFT JOIN BenTaher.dbo.bank AS b ON b.bank_no = w.bank
-LEFT JOIN new_erp.dbo.users AS u
-    ON u.company = @TargetCompany
-    AND u.empno = w.emp
+OUTER APPLY (
+    SELECT TOP (1) usr.id
+    FROM new_erp.dbo.users AS usr
+    WHERE usr.company = @TargetCompany
+      AND usr.empno = w.emp
+    ORDER BY usr.id
+) AS u
 WHERE NOT EXISTS (
     SELECT 1
     FROM BenTaher_erp.dbo.wrong_deductions AS wd
-    WHERE wd.id = w.wrong_no
+    WHERE wd.id = w.mapped_id
 );
 
 SET IDENTITY_INSERT BenTaher_erp.dbo.wrong_deductions OFF;
@@ -302,7 +317,7 @@ SELECT
                     CAST(t.wrec_no AS BIGINT)
                 )
             END
-        WHEN 2 THEN CAST(COALESCE(wm.wrong_no, 900000 + t.wrec_no) AS BIGINT)
+        WHEN 2 THEN CAST(COALESCE(wm.mapped_id, 900000 + t.wrec_no) AS BIGINT)
         WHEN 3 THEN
             COALESCE(
                 CASE
@@ -347,13 +362,22 @@ SELECT
 FROM BenTaher.dbo.tar_kst AS t
 LEFT JOIN BenTaher.dbo.kst_trans AS k ON k.wrec_no = t.wrec_no
 OUTER APPLY (
-    SELECT TOP (1) w.wrong_no
+    SELECT TOP (1)
+        CASE
+            WHEN w.wrec_no = (
+                SELECT MIN(w2.wrec_no)
+                FROM BenTaher.dbo.wrong_kst AS w2
+                WHERE w2.wrong_no = w.wrong_no
+            )
+                THEN CAST(w.wrong_no AS BIGINT)
+            ELSE 800000 + CAST(w.wrec_no AS BIGINT)
+        END AS mapped_id
     FROM BenTaher.dbo.wrong_kst AS w
     WHERE t.tar_type = 2
       AND w.bank = t.bank
       AND w.acc = t.acc
       AND ABS(w.kst - t.kst) < 0.01
-    ORDER BY w.wrong_no
+    ORDER BY w.wrec_no
 ) AS wm
 LEFT JOIN new_erp.dbo.users AS u
     ON u.company = @TargetCompany
@@ -387,10 +411,20 @@ INNER JOIN BenTaher.dbo.tar_kst AS t
         EXISTS (
             SELECT 1
             FROM BenTaher.dbo.wrong_kst AS wk
-            WHERE wk.wrong_no = w.id
-              AND wk.bank = t.bank
+            WHERE wk.bank = t.bank
               AND wk.acc = t.acc
               AND ABS(wk.kst - t.kst) < 0.01
+              AND (
+                    (
+                        wk.wrec_no = (
+                            SELECT MIN(w2.wrec_no)
+                            FROM BenTaher.dbo.wrong_kst AS w2
+                            WHERE w2.wrong_no = wk.wrong_no
+                        )
+                        AND w.id = wk.wrong_no
+                    )
+                    OR w.id = 800000 + CAST(wk.wrec_no AS BIGINT)
+              )
         )
         OR w.id = 900000 + CAST(t.wrec_no AS BIGINT)
     );

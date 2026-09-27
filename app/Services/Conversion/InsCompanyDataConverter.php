@@ -867,33 +867,57 @@ class InsCompanyDataConverter
             }
         }
 
-        if ($bankIds !== [] && $this->legacyHasTable('bank')) {
+        if ($bankIds !== []) {
             $existing = DB::connection($this->target)->table('installment_banks')->pluck('id')->flip();
             $rows = [];
 
-            foreach ($this->legacyTableOrdered('bank', 'bank_no') as $row) {
-                $id = (int) $row->bank_no;
+            if ($this->legacyHasTable('bank')) {
+                foreach ($this->legacyTableOrdered('bank', 'bank_no') as $row) {
+                    $id = (int) $row->bank_no;
 
-                if (! in_array($id, $bankIds, true) || $existing->has($id)) {
+                    if (! in_array($id, $bankIds, true) || $existing->has($id)) {
+                        continue;
+                    }
+
+                    $rows[] = [
+                        'id' => $id,
+                        'name' => $this->stringOrNull($row->bank_name ?? null) ?? 'bank_'.$id,
+                        'payroll_bank_id' => filled($row->bank_tajmeeh ?? $row->taj_id ?? null)
+                            ? (int) ($row->bank_tajmeeh ?? $row->taj_id)
+                            : null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                    $existing->put($id, true);
+                }
+            }
+
+            // MainArc/main may reference banks deleted from legacy `bank` (e.g. 14).
+            $placeholders = [];
+
+            foreach ($bankIds as $id) {
+                if ($existing->has($id)) {
                     continue;
                 }
 
-                $rows[] = [
+                $placeholders[] = [
                     'id' => $id,
-                    'name' => $this->stringOrNull($row->bank_name ?? null) ?? 'bank_'.$id,
-                    'payroll_bank_id' => filled($row->bank_tajmeeh ?? $row->taj_id ?? null)
-                        ? (int) ($row->bank_tajmeeh ?? $row->taj_id)
-                        : null,
+                    'name' => 'bank_'.$id,
+                    'payroll_bank_id' => null,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
                 $existing->put($id, true);
             }
 
+            $rows = [...$rows, ...$placeholders];
+
             $this->insertWithIdentity('installment_banks', $rows);
 
             if ($rows !== []) {
-                $this->log('Ensured '.count($rows).' installment bank(s) for installment contracts.');
+                $this->log('Ensured '.count($rows).' installment bank(s) for installment contracts'
+                    .($placeholders !== [] ? ' ('.count($placeholders).' placeholder for missing legacy banks)' : '')
+                    .'.');
             }
         }
     }

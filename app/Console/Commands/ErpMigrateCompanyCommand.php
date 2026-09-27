@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\SqlServerDatabaseWiper;
 use Illuminate\Console\Command;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\Artisan;
@@ -28,11 +29,7 @@ class ErpMigrateCompanyCommand extends Command
 
         if (($this->freshOption())) {
             $this->warn("Dropping all tables on [{$connection}]…");
-            Artisan::call('db:wipe', [
-                '--database' => $connection,
-                '--force' => true,
-            ]);
-            $this->line(Artisan::output());
+            app(SqlServerDatabaseWiper::class)->wipe($connection);
         }
 
         config(['erp.company_connections' => [$connection]]);
