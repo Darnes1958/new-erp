@@ -2,6 +2,9 @@
 
 namespace App\Database\Migrations\Concerns;
 
+use Illuminate\Support\Facades\Schema;
+use Throwable;
+
 trait MigratesCompanyDatabases
 {
     /**
@@ -30,5 +33,25 @@ trait MigratesCompanyDatabases
         foreach ($this->companyConnections() as $connection) {
             $callback($connection);
         }
+    }
+
+    /**
+     * True when the company DB is reachable and contains all required tables.
+     *
+     * @param  list<string>  $tables
+     */
+    protected function companyHasTables(string $connection, array $tables): bool
+    {
+        try {
+            foreach ($tables as $table) {
+                if (! Schema::connection($connection)->hasTable($table)) {
+                    return false;
+                }
+            }
+        } catch (Throwable) {
+            return false;
+        }
+
+        return true;
     }
 }

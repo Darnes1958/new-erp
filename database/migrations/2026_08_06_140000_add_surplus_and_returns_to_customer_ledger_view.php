@@ -12,7 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         $this->onEachCompanyConnection(function (string $connection): void {
-            if (! Schema::connection($connection)->hasTable('customer_receipts')) {
+            if (! $this->companyHasTables($connection, [
+                'sales_invoices',
+                'customer_receipts',
+                'customers',
+                'payment_methods',
+            ])) {
                 return;
             }
 
@@ -25,7 +30,7 @@ return new class extends Migration
     public function down(): void
     {
         $this->onEachCompanyConnection(function (string $connection): void {
-            if (! Schema::connection($connection)->hasTable('installment_deductions')) {
+            if (! $this->companyHasTables($connection, ['sales_invoices', 'customer_receipts'])) {
                 return;
             }
 
