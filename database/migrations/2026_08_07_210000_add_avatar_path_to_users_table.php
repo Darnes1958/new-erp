@@ -8,15 +8,23 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->string('avatar_path')->nullable()->after('is_prog');
-        });
+        $central = (string) config('erp.central_connection', 'sqlsrv');
+
+        if (! Schema::connection($central)->hasColumn('users', 'avatar_path')) {
+            Schema::connection($central)->table('users', function (Blueprint $table): void {
+                $table->string('avatar_path')->nullable()->after('is_prog');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('avatar_path');
-        });
+        $central = (string) config('erp.central_connection', 'sqlsrv');
+
+        if (Schema::connection($central)->hasColumn('users', 'avatar_path')) {
+            Schema::connection($central)->table('users', function (Blueprint $table): void {
+                $table->dropColumn('avatar_path');
+            });
+        }
     }
 };
