@@ -138,6 +138,15 @@ class OurCompanyForm
                 ])
                 ->columns(2)
                 ->visible(fn (): bool => (bool) Auth::user()?->is_prog),
+            Section::make('تفضيلات الشاشات')
+                ->description('إعدادات واجهة قابلة للتوسعة لاحقاً (جدول company_preferences).')
+                ->schema([
+                    Toggle::make('print_after_store_sales')
+                        ->label('طباعة فاتورة المبيعات بعد التخزين (افتراضي)')
+                        ->helperText('عند التفعيل، يكون خيار «طباعة بعد التخزين» محدداً مسبقاً في شاشة إدخال المبيعات.')
+                        ->default(false),
+                ])
+                ->columns(1),
         ]);
     }
 }

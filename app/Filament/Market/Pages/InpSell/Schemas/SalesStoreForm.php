@@ -5,9 +5,12 @@ namespace App\Filament\Market\Pages\InpSell\Schemas;
 use App\Models\BankAccount;
 use App\Models\CashBox;
 use App\Models\SalesInvoiceLineWork;
+use App\Support\CompanyPreferences;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 
@@ -31,27 +34,38 @@ class SalesStoreForm
                     ->columnSpanFull()
                     ->searchable()
                     ->visible(fn () => $page->work->amount_paid > 0 && $page->work->payment_method_id == 1),
-                Actions::make([
-                    Action::make('store')
-                        ->label(fn () => $page->isEditMode() ? 'حفظ التعديلات' : 'تخزين')
-                        ->icon(fn () => $page->isEditMode() ? 'heroicon-m-check' : 'heroicon-m-plus')
-                        ->button()
-                        ->visible(fn (): bool => SalesInvoiceLineWork::query()
-                            ->where('sales_invoice_work_id', Auth::id())
-                            ->exists())
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->action(fn () => $page->storeInvoice()),
-                    Action::make('clear')
-                        ->label(fn () => $page->isEditMode() ? 'إلغاء' : 'مسح')
-                        ->icon(fn () => $page->isEditMode() ? 'heroicon-m-x-mark' : 'heroicon-m-trash')
-                        ->button()
-                        ->color('danger')
-                        ->requiresConfirmation(fn () => ! $page->isEditMode())
-                        ->action(fn () => $page->clearDraft()),
+                Group::make([
+                    Checkbox::make('print_after_store')
+                        ->label('طباعة بعد التخزين')
+                        ->default(fn (): bool => CompanyPreferences::printAfterStoreSales())
+                        ->inline()
+                        ->visible(fn (): bool => ! $page->isEditMode()
+                            && SalesInvoiceLineWork::query()
+                                ->where('sales_invoice_work_id', Auth::id())
+                                ->exists()),
+                    Actions::make([
+                        Action::make('store')
+                            ->label(fn () => $page->isEditMode() ? 'حفظ التعديلات' : 'تخزين')
+                            ->icon(fn () => $page->isEditMode() ? 'heroicon-m-check' : 'heroicon-m-plus')
+                            ->button()
+                            ->visible(fn (): bool => SalesInvoiceLineWork::query()
+                                ->where('sales_invoice_work_id', Auth::id())
+                                ->exists())
+                            ->color('success')
+                            ->requiresConfirmation()
+                            ->action(fn () => $page->storeInvoice()),
+                        Action::make('clear')
+                            ->label(fn () => $page->isEditMode() ? 'إلغاء' : 'مسح')
+                            ->icon(fn () => $page->isEditMode() ? 'heroicon-m-x-mark' : 'heroicon-m-trash')
+                            ->button()
+                            ->color('danger')
+                            ->requiresConfirmation(fn () => ! $page->isEditMode())
+                            ->action(fn () => $page->clearDraft()),
+                    ]),
                 ])
+                    ->columns(2)
                     ->columnSpanFull()
-                    ->extraAttributes(['class' => 'items-center justify-between']),
+                    ->extraAttributes(['class' => 'items-center']),
             ]);
     }
 }

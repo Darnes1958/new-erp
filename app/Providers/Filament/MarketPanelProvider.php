@@ -118,6 +118,45 @@ class MarketPanelProvider extends PanelProvider
                             width: 100%;
                             max-width: 100%;
                         }
+
+                        /* Quick-create customer modal — distinct from main page surface */
+                        .fi-modal-window.market-create-customer-modal {
+                            background-color: #eef8f3 !important;
+                            border: 1px solid #8fc9b0;
+                            box-shadow: 0 18px 40px rgba(20, 83, 65, 0.18);
+                        }
+
+                        .fi-modal-window.market-create-customer-modal .fi-modal-header {
+                            background: linear-gradient(180deg, #d9f0e6 0%, #eef8f3 100%);
+                            border-bottom: 1px solid #b7ddcd;
+                            margin-block-end: 0.75rem;
+                            padding-block: 0.9rem;
+                        }
+
+                        .fi-modal-window.market-create-customer-modal .fi-modal-heading {
+                            color: #14532d;
+                            font-weight: 700;
+                        }
+
+                        .fi-modal-window.market-create-customer-modal .fi-modal-footer {
+                            background-color: #e3f4ec;
+                            border-top: 1px solid #b7ddcd;
+                        }
+
+                        .dark .fi-modal-window.market-create-customer-modal {
+                            background-color: #14352b !important;
+                            border-color: #2f6b56;
+                        }
+
+                        .dark .fi-modal-window.market-create-customer-modal .fi-modal-header,
+                        .dark .fi-modal-window.market-create-customer-modal .fi-modal-footer {
+                            background: #1a4033;
+                            border-color: #2f6b56;
+                        }
+
+                        .dark .fi-modal-window.market-create-customer-modal .fi-modal-heading {
+                            color: #bbf7d0;
+                        }
                     </style>
                     HTML,
             );

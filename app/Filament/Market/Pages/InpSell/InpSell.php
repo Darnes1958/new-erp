@@ -9,6 +9,7 @@ use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceLine;
 use App\Models\SalesInvoiceLineWork;
 use App\Models\SalesInvoiceWork;
+use App\Support\CompanyPreferences;
 use App\Support\ProgrammingError;
 use App\Services\Inventory\SalesInventoryService;
 use Filament\Notifications\Notification;
@@ -19,6 +20,7 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Js;
 use RuntimeException;
 use Throwable;
 
@@ -94,7 +96,9 @@ class InpSell extends Page implements HasSchemas, HasTable
 
         $this->headerForm->fill($this->work->toArray());
         $this->lineForm->fill([]);
-        $this->storeForm->fill([]);
+        $this->storeForm->fill([
+            'print_after_store' => CompanyPreferences::printAfterStoreSales(),
+        ]);
     }
 
     public function storeInvoice(): void
@@ -181,6 +185,9 @@ class InpSell extends Page implements HasSchemas, HasTable
             }
         }
 
+        $printAfterStore = (bool) ($this->storeData['print_after_store'] ?? false);
+        $invoiceId = null;
+
         try {
             DB::connection($this->work->getConnectionName())->transaction(function () use (
                 $inventory,
@@ -188,6 +195,7 @@ class InpSell extends Page implements HasSchemas, HasTable
                 $warehouseId,
                 $cashBoxId,
                 $bankAccountId,
+                &$invoiceId,
             ): void {
                 $invoice = SalesInvoice::query()->create([
                     'invoice_date' => $this->work->invoice_date,
@@ -206,6 +214,8 @@ class InpSell extends Page implements HasSchemas, HasTable
                     'notes' => $this->work->notes,
                     'created_by' => Auth::id(),
                 ]);
+
+                $invoiceId = (int) $invoice->id;
 
                 foreach ($lines as $line) {
                     $salesLine = SalesInvoiceLine::query()->create([
@@ -281,12 +291,19 @@ class InpSell extends Page implements HasSchemas, HasTable
         $this->work->refresh();
         $this->headerForm->fill($this->work->toArray());
         $this->lineForm->fill([]);
-        $this->storeForm->fill([]);
+        $this->storeForm->fill([
+            'print_after_store' => $printAfterStore,
+        ]);
 
         Notification::make()
             ->title('تم تخزين الفاتورة بنجاح')
             ->success()
             ->send();
+
+        if ($printAfterStore && $invoiceId) {
+            $url = route('pdf.sales-invoice', ['salesInvoice' => $invoiceId]);
+            $this->js('window.open('.Js::from($url).', "_blank")');
+        }
     }
 
     public function clearDraft(): void

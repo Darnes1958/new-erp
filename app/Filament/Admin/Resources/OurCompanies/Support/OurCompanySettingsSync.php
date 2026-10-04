@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\OurCompanies\Support;
 
+use App\Models\CompanyPreference;
 use App\Models\CompanySetting;
 use App\Support\FilamentSidebarStyle;
 
@@ -20,6 +21,7 @@ class OurCompanySettingsSync
         }
 
         $settings = CompanySetting::query()->find($connectionName);
+        $preferences = CompanyPreference::query()->find($connectionName);
 
         $data['sidebar_group_gap_px'] = $settings?->sidebar_group_gap_px
             ?? FilamentSidebarStyle::DEFAULT_GROUP_GAP_PX;
@@ -37,6 +39,7 @@ class OurCompanySettingsSync
             ?? FilamentSidebarStyle::DEFAULT_TABLE_HEADER_FONT_SIZE_PX;
         $data['user_message'] = $settings?->user_message;
         $data['alert_message'] = $settings?->alert_message;
+        $data['print_after_store_sales'] = (bool) ($preferences?->print_after_store_sales ?? false);
 
         return $data;
     }
@@ -93,6 +96,13 @@ class OurCompanySettingsSync
                 ),
                 'user_message' => filled($data['user_message'] ?? null) ? $data['user_message'] : null,
                 'alert_message' => filled($data['alert_message'] ?? null) ? $data['alert_message'] : null,
+            ],
+        );
+
+        CompanyPreference::query()->updateOrCreate(
+            ['company' => $connectionName],
+            [
+                'print_after_store_sales' => (bool) ($data['print_after_store_sales'] ?? false),
             ],
         );
     }

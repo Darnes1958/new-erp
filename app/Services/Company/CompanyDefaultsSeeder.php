@@ -2,6 +2,7 @@
 
 namespace App\Services\Company;
 
+use App\Models\CompanyPreference;
 use App\Models\CompanySetting;
 use App\Models\OurCompany;
 use Illuminate\Support\Facades\DB;
@@ -141,6 +142,13 @@ class CompanyDefaultsSeeder
                 'link_sales_to_installments' => false,
                 'installment_by_payroll_bank' => true,
                 'auto_price_update' => false,
+            ],
+        );
+
+        CompanyPreference::query()->updateOrCreate(
+            ['company' => $connection],
+            [
+                'print_after_store_sales' => false,
             ],
         );
     }

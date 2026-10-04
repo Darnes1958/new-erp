@@ -4,6 +4,7 @@ namespace App\Filament\Market\Pages\InpSellOffer\Schemas;
 
 use App\Models\Customer;
 use App\Support\CompanySettings;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
@@ -57,6 +58,11 @@ class SalesOfferHeaderForm
                             Hidden::make('created_by')->default(Auth::id()),
                         ]),
                     ])
+                    ->createOptionModalHeading('ادخال زبون جديد')
+                    ->createOptionAction(fn (Action $action): Action => $action
+                        ->extraModalWindowAttributes([
+                            'class' => 'market-create-customer-modal',
+                        ]))
                     ->id('customer_id'),
                 Select::make('warehouse_id')
                     ->label('نقطة البيع')
