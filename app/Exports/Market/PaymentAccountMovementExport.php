@@ -76,10 +76,12 @@ class PaymentAccountMovementExport implements FromCollection, WithEvents, WithHe
             [''],
             [$this->reportTitle.' : '.Utf8Text::clean($this->accountName)],
             [$periodLine],
-            ['الرصيد السابق : '.ErpNumber::money($this->openingBalance)],
+            ['رصيد بداية المدة : '.ErpNumber::money($this->periodTotals['carried'] ?? 0)
+                .'    الرصيد السابق : '.ErpNumber::money($this->openingBalance)],
             ['مدين : '.ErpNumber::money($this->periodTotals['debit'])
                 .'    دائن : '.ErpNumber::money($this->periodTotals['credit'])
-                .'    الرصيد : '.ErpNumber::money($this->periodTotals['balance'])],
+                .'    رصيد الفترة : '.ErpNumber::money($this->periodTotals['balance'])
+                .'    الرصيد النهائي : '.ErpNumber::money($this->periodTotals['final'] ?? ($this->openingBalance + ($this->periodTotals['balance'] ?? 0)))],
             ['البيان', 'الطرف', 'التاريخ', 'مدين', 'دائن', 'الرصيد', 'رقم المستند', 'ملاحظات'],
         ];
     }

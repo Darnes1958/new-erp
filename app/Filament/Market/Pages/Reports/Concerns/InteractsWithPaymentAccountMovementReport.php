@@ -2,15 +2,11 @@
 
 namespace App\Filament\Market\Pages\Reports\Concerns;
 
-use App\Models\BankAccountLedgerEntry;
-use App\Models\CashBoxLedgerEntry;
 use App\Services\Excel\MarketExcelService;
 use App\Services\Market\PaymentAccountLedgerReportService;
 use App\Services\Pdf\PaymentAccountLedgerPdfService;
 use App\Support\PdfDownload;
-use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 
 trait InteractsWithPaymentAccountMovementReport
 {
@@ -27,6 +23,11 @@ trait InteractsWithPaymentAccountMovementReport
      */
     abstract protected function periodTotals(PaymentAccountLedgerReportService $service): array;
 
+    /**
+     * @return array{carried: float, previous: float, debit: float, credit: float, balance: float, final: float}
+     */
+    abstract protected function statement(PaymentAccountLedgerReportService $service): array;
+
     abstract protected function reportTitle(): string;
 
     abstract protected function excelReportTitle(): string;
@@ -35,16 +36,14 @@ trait InteractsWithPaymentAccountMovementReport
 
     protected function downloadPaymentAccountExcel(): mixed
     {
-        $rows = $this->exportPaymentAccountRows();
-
-        if ($rows === null) {
+        if (! $this->validateAccountSelected()) {
             return null;
         }
 
         $service = app(PaymentAccountLedgerReportService::class);
         $accountId = $this->{$this->accountIdProperty()};
-        $openingBalance = $this->openingBalance($service);
-        $rows = $service->attachRunningBalance($rows, $openingBalance);
+        $statement = $this->statement($service);
+        $rows = $service->attachRunningBalance($this->movementQuery($service)->get(), $statement['previous']);
 
         return app(MarketExcelService::class)->paymentAccountMovement(
             rows: $rows,
@@ -52,55 +51,31 @@ trait InteractsWithPaymentAccountMovementReport
             accountName: $this->accountName($accountId) ?? '',
             dateFrom: $this->dateFrom,
             dateTo: $this->dateTo,
-            openingBalance: $openingBalance,
-            periodTotals: $this->periodTotals($service),
+            openingBalance: $statement['previous'],
+            periodTotals: $statement,
         );
     }
 
     protected function downloadPaymentAccountPdf(): mixed
     {
-        $rows = $this->exportPaymentAccountRows();
-
-        if ($rows === null) {
+        if (! $this->validateAccountSelected()) {
             return null;
         }
 
         $service = app(PaymentAccountLedgerReportService::class);
         $accountId = $this->{$this->accountIdProperty()};
+        $statement = $this->statement($service);
 
         return PdfDownload::streamed(
             app(PaymentAccountLedgerPdfService::class)->movement(
                 reportTitle: $this->excelReportTitle(),
                 accountName: $this->accountName($accountId) ?? '',
-                rows: $rows,
+                rows: $this->movementQuery($service)->get(),
                 dateFrom: $this->dateFrom,
                 dateTo: $this->dateTo,
-                openingBalance: $this->openingBalance($service),
-                periodTotals: $this->periodTotals($service),
+                openingBalance: $statement['previous'],
+                periodTotals: $statement,
             ),
         );
-    }
-
-    /**
-     * @return Collection<int, CashBoxLedgerEntry|BankAccountLedgerEntry>|null
-     */
-    protected function exportPaymentAccountRows(): ?Collection
-    {
-        if (! $this->validateAccountSelected()) {
-            return null;
-        }
-
-        $rows = $this->movementQuery(app(PaymentAccountLedgerReportService::class))->get();
-
-        if ($rows->isEmpty()) {
-            Notification::make()
-                ->title('لا توجد بيانات للتصدير')
-                ->warning()
-                ->send();
-
-            return null;
-        }
-
-        return $rows;
     }
 }

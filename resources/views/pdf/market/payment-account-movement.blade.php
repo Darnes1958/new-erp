@@ -15,7 +15,11 @@
     </div>
 
     <div style="text-align: center; margin-bottom: 8px;">
-        <label style="font-size: 12pt;">الرصيد السابق : {{ \App\Support\ErpNumber::money($openingBalance) }}</label>
+        <label style="font-size: 12pt;">
+            رصيد بداية المدة : {{ \App\Support\ErpNumber::money($periodTotals['carried'] ?? 0) }}
+            &nbsp;&nbsp;
+            الرصيد السابق : {{ \App\Support\ErpNumber::money($openingBalance) }}
+        </label>
     </div>
 
     <div style="text-align: center; margin-bottom: 12px;">
@@ -24,7 +28,9 @@
             &nbsp;&nbsp;
             دائن : {{ \App\Support\ErpNumber::money($periodTotals['credit']) }}
             &nbsp;&nbsp;
-            الرصيد : {{ \App\Support\ErpNumber::money($periodTotals['balance']) }}
+            رصيد الفترة : {{ \App\Support\ErpNumber::money($periodTotals['balance']) }}
+            &nbsp;&nbsp;
+            الرصيد النهائي : {{ \App\Support\ErpNumber::money($periodTotals['final'] ?? ($openingBalance + ($periodTotals['balance'] ?? 0))) }}
         </label>
     </div>
 

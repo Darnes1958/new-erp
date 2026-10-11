@@ -122,6 +122,25 @@ class CashBoxMovementReportPage extends Page implements HasActions, HasForms, Ha
                             ->columns(8),
                         Section::make()
                             ->schema([
+                                Placeholder::make('previous_heading')
+                                    ->hiddenLabel()
+                                    ->content('الرصيد السابق')
+                                    ->extraAttributes(['class' => 'text-info-600']),
+                                Placeholder::make('carriedForward')
+                                    ->label('رصيد بداية المدة')
+                                    ->content(fn (): string => number_format($service->cashBoxStatement($this->cashBoxId, $this->dateFrom, $this->dateTo)['carried'], 3, '.', ',')),
+                                Placeholder::make('previousBalance')
+                                    ->label('الرصيد السابق')
+                                    ->content(fn (): string => number_format($service->cashBoxStatement($this->cashBoxId, $this->dateFrom, $this->dateTo)['previous'], 3, '.', ',')),
+                                Placeholder::make('finalBalance')
+                                    ->label('الرصيد النهائي')
+                                    ->content(function () use ($service): HtmlString|string {
+                                        $balance = $service->cashBoxStatement($this->cashBoxId, $this->dateFrom, $this->dateTo)['final'];
+
+                                        return $balance < 0
+                                            ? new HtmlString('<span class="text-danger-600">'.number_format($balance, 3, '.', ',').'</span>')
+                                            : new HtmlString('<span class="text-indigo-700">'.number_format($balance, 3, '.', ',').'</span>');
+                                    }),
                                 Placeholder::make('period_heading')
                                     ->hiddenLabel()
                                     ->content('الرصيد خلال الفترة')
@@ -133,7 +152,7 @@ class CashBoxMovementReportPage extends Page implements HasActions, HasForms, Ha
                                     ->label('دائن')
                                     ->content(fn (): string => number_format($service->cashBoxPeriodTotals($this->cashBoxId, $this->dateFrom, $this->dateTo)['credit'], 3, '.', ',')),
                                 Placeholder::make('periodBalance')
-                                    ->label('الرصيد')
+                                    ->label('رصيد الفترة')
                                     ->content(function () use ($service): HtmlString|string {
                                         $balance = $service->cashBoxPeriodTotals($this->cashBoxId, $this->dateFrom, $this->dateTo)['balance'];
 
@@ -177,7 +196,13 @@ class CashBoxMovementReportPage extends Page implements HasActions, HasForms, Ha
 
         return $table
             ->query(fn (): Builder => $this->buildReportQuery())
-            ->heading(fn (): string => 'الرصيد السابق: '.number_format($service->cashBoxOpeningBalance($this->cashBoxId, $this->dateFrom), 3, '.', ','))
+            ->heading(function () use ($service): string {
+                $statement = $service->cashBoxStatement($this->cashBoxId, $this->dateFrom, $this->dateTo);
+
+                return 'رصيد بداية المدة: '.number_format($statement['carried'], 3, '.', ',')
+                    .' — الرصيد السابق: '.number_format($statement['previous'], 3, '.', ',')
+                    .' — الرصيد النهائي: '.number_format($statement['final'], 3, '.', ',');
+            })
             ->columns([
                 TextColumn::make('transaction_kind')
                     ->label('البيان')
@@ -242,6 +267,11 @@ class CashBoxMovementReportPage extends Page implements HasActions, HasForms, Ha
     protected function periodTotals(PaymentAccountLedgerReportService $service): array
     {
         return $service->cashBoxPeriodTotals($this->cashBoxId, $this->dateFrom, $this->dateTo);
+    }
+
+    protected function statement(PaymentAccountLedgerReportService $service): array
+    {
+        return $service->cashBoxStatement($this->cashBoxId, $this->dateFrom, $this->dateTo);
     }
 
     protected function reportTitle(): string

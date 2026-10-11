@@ -110,6 +110,60 @@ class PaymentAccountLedgerReportService
         return round($openingBalance + $movementBefore, 3);
     }
 
+    public function bankAccountCarriedForward(?int $bankAccountId): float
+    {
+        if (! filled($bankAccountId)) {
+            return 0;
+        }
+
+        return round((float) (BankAccount::query()->whereKey($bankAccountId)->value('opening_balance') ?? 0), 3);
+    }
+
+    /**
+     * @return array{carried: float, previous: float, debit: float, credit: float, balance: float, final: float}
+     */
+    public function bankAccountStatement(?int $bankAccountId, ?string $dateFrom, ?string $dateTo): array
+    {
+        $previous = $this->bankAccountOpeningBalance($bankAccountId, $dateFrom);
+        $period = $this->bankAccountPeriodTotals($bankAccountId, $dateFrom, $dateTo);
+
+        return [
+            'carried' => $this->bankAccountCarriedForward($bankAccountId),
+            'previous' => $previous,
+            'debit' => $period['debit'],
+            'credit' => $period['credit'],
+            'balance' => $period['balance'],
+            'final' => round($previous + $period['balance'], 3),
+        ];
+    }
+
+    public function cashBoxCarriedForward(?int $cashBoxId): float
+    {
+        if (! filled($cashBoxId)) {
+            return 0;
+        }
+
+        return round((float) (CashBox::query()->whereKey($cashBoxId)->value('opening_balance') ?? 0), 3);
+    }
+
+    /**
+     * @return array{carried: float, previous: float, debit: float, credit: float, balance: float, final: float}
+     */
+    public function cashBoxStatement(?int $cashBoxId, ?string $dateFrom, ?string $dateTo): array
+    {
+        $previous = $this->cashBoxOpeningBalance($cashBoxId, $dateFrom);
+        $period = $this->cashBoxPeriodTotals($cashBoxId, $dateFrom, $dateTo);
+
+        return [
+            'carried' => $this->cashBoxCarriedForward($cashBoxId),
+            'previous' => $previous,
+            'debit' => $period['debit'],
+            'credit' => $period['credit'],
+            'balance' => $period['balance'],
+            'final' => round($previous + $period['balance'], 3),
+        ];
+    }
+
     /**
      * @return array{debit: float, credit: float, balance: float}
      */
