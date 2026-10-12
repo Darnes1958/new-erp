@@ -7,6 +7,8 @@ use App\Filament\Market\Pages\Reports\Concerns\InteractsWithMarketReportExports;
 use App\Filament\Market\Support\MarketNavigationGroup;
 use App\Services\Excel\MarketExcelService;
 use App\Services\Market\CustomerLedgerReportService;
+use App\Services\Pdf\CustomerLedgerPdfService;
+use App\Support\PdfDownload;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\Checkbox;
@@ -109,6 +111,7 @@ class CustomerBalancesReportPage extends Page implements HasActions, HasForms, H
                                 $this->resetTable();
                             }),
                         Actions::make([
+                            InstallmentListPrintActions::compactPrint('print', fn () => $this->downloadPdf()),
                             InstallmentListPrintActions::compactExcel('exportExcel', fn () => $this->downloadExcel()),
                         ])
                             ->columnSpan(2)
@@ -205,6 +208,27 @@ class CustomerBalancesReportPage extends Page implements HasActions, HasForms, H
             rows: $rows,
             reportTitle: $title,
             summary: $summary,
+        );
+    }
+
+    protected function downloadPdf(): mixed
+    {
+        $rows = $this->exportRows('لا توجد بيانات للطباعة');
+
+        if ($rows === null) {
+            return null;
+        }
+
+        $service = app(CustomerLedgerReportService::class);
+        $summary = $service->balancesSummary($this->dateFrom, $this->dateTo);
+        $title = 'أرصدة الزبائن من تاريخ '.$this->dateFrom.' إلي تاريخ '.$this->dateTo;
+
+        return PdfDownload::streamed(
+            app(CustomerLedgerPdfService::class)->customerBalances(
+                rows: $rows,
+                reportTitle: $title,
+                summary: $summary,
+            ),
         );
     }
 }

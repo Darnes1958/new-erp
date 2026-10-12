@@ -52,8 +52,8 @@ class SupplierBalancesExport implements FromCollection, WithHeadings, WithMappin
     public function headings(): array
     {
         return [
-            [Utf8Text::clean($this->company?->CompanyName)],
-            [Utf8Text::clean($this->company?->CompanyNameSuffix)],
+            [Utf8Text::clean($this->company?->display_name)],
+            [Utf8Text::clean($this->company?->display_name_suffix)],
             [''],
             [''],
             [''],
@@ -74,7 +74,7 @@ class SupplierBalancesExport implements FromCollection, WithHeadings, WithMappin
                 'C' => 14,
                 'D' => 14,
             ],
-            rightAlignedRows: [1, 2],
+            rightAlignedRows: [2],
             centeredInfoRows: [5],
         );
 
@@ -83,6 +83,22 @@ class SupplierBalancesExport implements FromCollection, WithHeadings, WithMappin
                 $rtlEvents[AfterSheet::class]($event);
 
                 $sheet = $event->sheet->getDelegate();
+
+                $sheet->mergeCells('A1:B1');
+                $sheet->setCellValue('A1', Utf8Text::clean($this->company?->display_name));
+                $sheet->getStyle('A1')->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT)
+                    ->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+
+                $sheet->mergeCells('C1:D1');
+                $sheet->setCellValue('C1', 'تاريخ الطباعة : '.now()->toDateString());
+                $sheet->getStyle('C1:D1')->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+                    ->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('C1')->getFont()->setSize(11);
+
+                $sheet->getStyle('A2')->getFont()->setSize(13);
 
                 $sheet->mergeCells('A5:D5');
                 $sheet->setCellValue('A5', $this->reportTitle);

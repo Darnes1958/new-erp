@@ -128,19 +128,19 @@ class BankAccountMovementReportPage extends Page implements HasActions, HasForms
                                     ->extraAttributes(['class' => 'text-info-600']),
                                 Placeholder::make('carriedForward')
                                     ->label('رصيد بداية المدة')
-                                    ->content(fn (): string => number_format($service->bankAccountStatement($this->bankAccountId, $this->dateFrom, $this->dateTo)['carried'], 3, '.', ',')),
+                                    ->content(fn (): HtmlString => $this->signedBalanceHtml(
+                                        $service->bankAccountStatement($this->bankAccountId, $this->dateFrom, $this->dateTo)['carried']
+                                    )),
                                 Placeholder::make('previousBalance')
                                     ->label('الرصيد السابق')
-                                    ->content(fn (): string => number_format($service->bankAccountStatement($this->bankAccountId, $this->dateFrom, $this->dateTo)['previous'], 3, '.', ',')),
+                                    ->content(fn (): HtmlString => $this->signedBalanceHtml(
+                                        $service->bankAccountStatement($this->bankAccountId, $this->dateFrom, $this->dateTo)['previous']
+                                    )),
                                 Placeholder::make('finalBalance')
                                     ->label('الرصيد النهائي')
-                                    ->content(function () use ($service): HtmlString|string {
-                                        $balance = $service->bankAccountStatement($this->bankAccountId, $this->dateFrom, $this->dateTo)['final'];
-
-                                        return $balance < 0
-                                            ? new HtmlString('<span class="text-danger-600">'.number_format($balance, 3, '.', ',').'</span>')
-                                            : new HtmlString('<span class="text-indigo-700">'.number_format($balance, 3, '.', ',').'</span>');
-                                    }),
+                                    ->content(fn (): HtmlString => $this->signedBalanceHtml(
+                                        $service->bankAccountStatement($this->bankAccountId, $this->dateFrom, $this->dateTo)['final']
+                                    )),
                                 Placeholder::make('period_heading')
                                     ->hiddenLabel()
                                     ->content('الرصيد خلال الفترة')
@@ -153,13 +153,9 @@ class BankAccountMovementReportPage extends Page implements HasActions, HasForms
                                     ->content(fn (): string => number_format($service->bankAccountPeriodTotals($this->bankAccountId, $this->dateFrom, $this->dateTo)['credit'], 3, '.', ',')),
                                 Placeholder::make('periodBalance')
                                     ->label('رصيد الفترة')
-                                    ->content(function () use ($service): HtmlString|string {
-                                        $balance = $service->bankAccountPeriodTotals($this->bankAccountId, $this->dateFrom, $this->dateTo)['balance'];
-
-                                        return $balance < 0
-                                            ? new HtmlString('<span class="text-danger-600">'.number_format($balance, 3, '.', ',').'</span>')
-                                            : new HtmlString('<span class="text-indigo-700">'.number_format($balance, 3, '.', ',').'</span>');
-                                    }),
+                                    ->content(fn (): HtmlString => $this->signedBalanceHtml(
+                                        $service->bankAccountPeriodTotals($this->bankAccountId, $this->dateFrom, $this->dateTo)['balance']
+                                    )),
                             ])
                             ->columns(4),
                     ])
@@ -196,13 +192,9 @@ class BankAccountMovementReportPage extends Page implements HasActions, HasForms
 
         return $table
             ->query(fn (): Builder => $this->buildReportQuery())
-            ->heading(function () use ($service): string {
-                $statement = $service->bankAccountStatement($this->bankAccountId, $this->dateFrom, $this->dateTo);
-
-                return 'رصيد بداية المدة: '.number_format($statement['carried'], 3, '.', ',')
-                    .' — الرصيد السابق: '.number_format($statement['previous'], 3, '.', ',')
-                    .' — الرصيد النهائي: '.number_format($statement['final'], 3, '.', ',');
-            })
+            ->heading(fn (): HtmlString => $this->statementHeadingHtml(
+                $service->bankAccountStatement($this->bankAccountId, $this->dateFrom, $this->dateTo)
+            ))
             ->columns([
                 TextColumn::make('transaction_kind')
                     ->label('البيان')
@@ -222,7 +214,8 @@ class BankAccountMovementReportPage extends Page implements HasActions, HasForms
                     ->color('info'),
                 TextColumn::make('running_balance')
                     ->label('الرصيد')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->color(fn ($state): string => (float) $state < 0 ? 'danger' : ((float) $state > 0 ? 'success' : 'gray')),
                 TextColumn::make('document_no')
                     ->label('رقم المستند'),
                 TextColumn::make('notes')

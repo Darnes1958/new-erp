@@ -13,6 +13,7 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
@@ -112,6 +113,17 @@ class PaymentAccountMovementExport implements FromCollection, WithEvents, WithHe
                 $sheet = $event->sheet->getDelegate();
                 $rowIndex = self::DATA_START_ROW;
 
+                $sheet->getCell('A6')->setValue($this->signedSummaryRichText([
+                    ['label' => 'رصيد بداية المدة : ', 'value' => (float) ($this->periodTotals['carried'] ?? 0)],
+                    ['label' => 'الرصيد السابق : ', 'value' => $this->openingBalance],
+                ]));
+                $sheet->getCell('A7')->setValue($this->signedSummaryRichText([
+                    ['label' => 'مدين : ', 'value' => (float) $this->periodTotals['debit'], 'signed' => false],
+                    ['label' => 'دائن : ', 'value' => (float) $this->periodTotals['credit'], 'signed' => false],
+                    ['label' => 'رصيد الفترة : ', 'value' => (float) $this->periodTotals['balance']],
+                    ['label' => 'الرصيد النهائي : ', 'value' => (float) ($this->periodTotals['final'] ?? ($this->openingBalance + ($this->periodTotals['balance'] ?? 0)))],
+                ]));
+
                 foreach ($this->rows as $entry) {
                     $sheet->fromArray($this->map($entry), null, "A{$rowIndex}");
                     $rowIndex++;
@@ -127,7 +139,50 @@ class PaymentAccountMovementExport implements FromCollection, WithEvents, WithHe
                         ->getAlignment()
                         ->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 }
+
+                $colorRow = self::DATA_START_ROW;
+
+                foreach ($this->rows as $entry) {
+                    $balanceArgb = ErpNumber::signedExcelArgb($entry->running_balance ?? 0);
+
+                    if ($balanceArgb !== null) {
+                        $sheet->getStyle("F{$colorRow}")->getFont()->getColor()->setARGB($balanceArgb);
+                    }
+
+                    $colorRow++;
+                }
             },
         ];
+    }
+
+    /**
+     * @param  list<array{label: string, value: float, signed?: bool}>  $parts
+     */
+    protected function signedSummaryRichText(array $parts): RichText
+    {
+        $rich = new RichText();
+        $first = true;
+
+        foreach ($parts as $part) {
+            if (! $first) {
+                $rich->createText('    ');
+            }
+
+            $first = false;
+            $rich->createText($part['label']);
+            $run = $rich->createTextRun(ErpNumber::money($part['value']));
+            $signed = $part['signed'] ?? true;
+
+            if ($signed) {
+                $argb = ErpNumber::signedExcelArgb($part['value']);
+
+                if ($argb !== null) {
+                    $run->getFont()->getColor()->setARGB($argb);
+                    $run->getFont()->setBold(true);
+                }
+            }
+        }
+
+        return $rich;
     }
 }

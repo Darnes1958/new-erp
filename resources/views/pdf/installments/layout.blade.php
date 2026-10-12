@@ -5,6 +5,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Amiri&display=swap" rel="stylesheet"/>
     <style>
         body {
+            position: relative;
             direction: rtl;
             font-family: Amiri, serif;
         }

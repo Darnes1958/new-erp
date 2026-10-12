@@ -5,8 +5,10 @@ namespace App\Filament\Market\Pages\Reports\Concerns;
 use App\Services\Excel\MarketExcelService;
 use App\Services\Market\PaymentAccountLedgerReportService;
 use App\Services\Pdf\PaymentAccountLedgerPdfService;
+use App\Support\ErpNumber;
 use App\Support\PdfDownload;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 
 trait InteractsWithPaymentAccountMovementReport
 {
@@ -33,6 +35,23 @@ trait InteractsWithPaymentAccountMovementReport
     abstract protected function excelReportTitle(): string;
 
     abstract protected function validateAccountSelected(): bool;
+
+    protected function signedBalanceHtml(float $balance): HtmlString
+    {
+        return ErpNumber::signedHtml($balance);
+    }
+
+    /**
+     * @param  array{carried: float, previous: float, final: float}  $statement
+     */
+    protected function statementHeadingHtml(array $statement): HtmlString
+    {
+        return new HtmlString(
+            'رصيد بداية المدة: '.$this->signedBalanceHtml((float) $statement['carried'])
+            .' — الرصيد السابق: '.$this->signedBalanceHtml((float) $statement['previous'])
+            .' — الرصيد النهائي: '.$this->signedBalanceHtml((float) $statement['final'])
+        );
+    }
 
     protected function downloadPaymentAccountExcel(): mixed
     {

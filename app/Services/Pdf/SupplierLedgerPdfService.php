@@ -33,4 +33,22 @@ class SupplierLedgerPdfService
             'service' => app(SupplierLedgerReportService::class),
         ])->name('supplier-movement.pdf');
     }
+
+    /**
+     * @param  Collection<int, object>  $rows
+     * @param  array{debit: float, credit: float, balance: float}  $summary
+     */
+    public function supplierBalances(
+        Collection $rows,
+        string $reportTitle,
+        array $summary,
+        ?OurCompany $company = null,
+    ): PdfBuilder {
+        return Pdf::view('pdf.market.supplier-balances', [
+            'company' => $company ?? OurCompany::forCurrentUser(),
+            'rows' => $rows,
+            'reportTitle' => $reportTitle,
+            'summary' => $summary,
+        ])->name('supplier-balances.pdf');
+    }
 }

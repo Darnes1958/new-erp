@@ -39,9 +39,7 @@ class CustomerBalancesExport implements FromCollection, WithHeadings, WithMappin
         protected array $summary,
     ) {
         $typeNames = CustomerType::query()->pluck('name', 'id')->all();
-        $customerTypes = Customer::query()
-            ->whereIn('id', $this->rows->pluck('customer_id')->unique()->all())
-            ->pluck('customer_type_id', 'id');
+        $customerTypes = Customer::query()->pluck('customer_type_id', 'id');
 
         foreach ($customerTypes as $customerId => $typeId) {
             $this->customerTypeNames[(int) $customerId] = $typeNames[$typeId] ?? '—';
@@ -67,8 +65,8 @@ class CustomerBalancesExport implements FromCollection, WithHeadings, WithMappin
     public function headings(): array
     {
         return [
-            [Utf8Text::clean($this->company?->CompanyName)],
-            [Utf8Text::clean($this->company?->CompanyNameSuffix)],
+            [Utf8Text::clean($this->company?->display_name)],
+            [Utf8Text::clean($this->company?->display_name_suffix)],
             [''],
             [''],
             [''],
@@ -90,7 +88,7 @@ class CustomerBalancesExport implements FromCollection, WithHeadings, WithMappin
                 'D' => 14,
                 'E' => 14,
             ],
-            rightAlignedRows: [1, 2],
+            rightAlignedRows: [2],
             centeredInfoRows: [5],
         );
 
@@ -99,6 +97,22 @@ class CustomerBalancesExport implements FromCollection, WithHeadings, WithMappin
                 $rtlEvents[AfterSheet::class]($event);
 
                 $sheet = $event->sheet->getDelegate();
+
+                $sheet->mergeCells('A1:C1');
+                $sheet->setCellValue('A1', Utf8Text::clean($this->company?->display_name));
+                $sheet->getStyle('A1')->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT)
+                    ->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+
+                $sheet->mergeCells('D1:E1');
+                $sheet->setCellValue('D1', 'تاريخ الطباعة : '.now()->toDateString());
+                $sheet->getStyle('D1:E1')->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+                    ->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('D1')->getFont()->setSize(11);
+
+                $sheet->getStyle('A2')->getFont()->setSize(13);
 
                 $sheet->mergeCells('A5:E5');
                 $sheet->setCellValue('A5', $this->reportTitle);

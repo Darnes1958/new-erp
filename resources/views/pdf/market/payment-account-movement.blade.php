@@ -16,9 +16,9 @@
 
     <div style="text-align: center; margin-bottom: 8px;">
         <label style="font-size: 12pt;">
-            رصيد بداية المدة : {{ \App\Support\ErpNumber::money($periodTotals['carried'] ?? 0) }}
+            رصيد بداية المدة : {!! \App\Support\ErpNumber::moneySignedHtml($periodTotals['carried'] ?? 0) !!}
             &nbsp;&nbsp;
-            الرصيد السابق : {{ \App\Support\ErpNumber::money($openingBalance) }}
+            الرصيد السابق : {!! \App\Support\ErpNumber::moneySignedHtml($openingBalance) !!}
         </label>
     </div>
 
@@ -28,9 +28,9 @@
             &nbsp;&nbsp;
             دائن : {{ \App\Support\ErpNumber::money($periodTotals['credit']) }}
             &nbsp;&nbsp;
-            رصيد الفترة : {{ \App\Support\ErpNumber::money($periodTotals['balance']) }}
+            رصيد الفترة : {!! \App\Support\ErpNumber::moneySignedHtml($periodTotals['balance']) !!}
             &nbsp;&nbsp;
-            الرصيد النهائي : {{ \App\Support\ErpNumber::money($periodTotals['final'] ?? ($openingBalance + ($periodTotals['balance'] ?? 0))) }}
+            الرصيد النهائي : {!! \App\Support\ErpNumber::moneySignedHtml($periodTotals['final'] ?? ($openingBalance + ($periodTotals['balance'] ?? 0))) !!}
         </label>
     </div>
 
@@ -55,7 +55,7 @@
                 <td style="text-align: center;">{{ $row->rep_date?->format('Y-m-d') }}</td>
                 <td style="text-align: center;">{{ \App\Support\ErpNumber::money($row->mden) }}</td>
                 <td style="text-align: center;">{{ \App\Support\ErpNumber::money($row->daen) }}</td>
-                <td style="text-align: center;">{{ \App\Support\ErpNumber::money($row->running_balance ?? 0) }}</td>
+                <td style="text-align: center;">{!! \App\Support\ErpNumber::moneySignedHtml($row->running_balance ?? 0) !!}</td>
                 <td style="text-align: center;">{{ $row->document_no }}</td>
                 <td>{{ \App\Support\Utf8Text::clean($row->notes) }}</td>
             </tr>
