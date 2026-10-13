@@ -54,6 +54,17 @@ class SalesStoreForm
                             ->color('success')
                             ->requiresConfirmation()
                             ->action(fn () => $page->storeInvoice()),
+                        Action::make('printDraft')
+                            ->label('طباعة')
+                            ->icon('heroicon-o-printer')
+                            ->button()
+                            ->color('info')
+                            ->visible(fn (): bool => ! $page->isEditMode()
+                                && SalesInvoiceLineWork::query()
+                                    ->where('sales_invoice_work_id', Auth::id())
+                                    ->exists())
+                            ->url(fn (): string => route('pdf.sales-work-print-set'))
+                            ->openUrlInNewTab(),
                         Action::make('clear')
                             ->label(fn () => $page->isEditMode() ? 'إلغاء' : 'مسح')
                             ->icon(fn () => $page->isEditMode() ? 'heroicon-m-x-mark' : 'heroicon-m-trash')

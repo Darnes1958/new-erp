@@ -50,7 +50,7 @@ class QuickSalesStoreForm
                         ->button()
                         ->color('info')
                         ->visible(fn (): bool => filled($page->idToPrint ?? null))
-                        ->url(fn (): string => route('pdf.sales-invoice', ['salesInvoice' => $page->idToPrint]))
+                        ->url(fn (): string => route('pdf.sales-invoice-print-set', ['salesInvoice' => $page->idToPrint]))
                         ->openUrlInNewTab(),
                 ])
                     ->columnSpanFull()

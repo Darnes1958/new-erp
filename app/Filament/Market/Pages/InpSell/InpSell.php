@@ -301,7 +301,7 @@ class InpSell extends Page implements HasSchemas, HasTable
             ->send();
 
         if ($printAfterStore && $invoiceId) {
-            $url = route('pdf.sales-invoice', ['salesInvoice' => $invoiceId]);
+            $url = route('pdf.sales-invoice-print-set', ['salesInvoice' => $invoiceId]);
             $this->js('window.open('.Js::from($url).', "_blank")');
         }
     }

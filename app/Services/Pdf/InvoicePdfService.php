@@ -5,6 +5,7 @@ namespace App\Services\Pdf;
 use App\Models\OurCompany;
 use App\Models\PurchaseInvoice;
 use App\Models\SalesInvoice;
+use App\Models\SalesInvoiceWork;
 use App\Models\SalesOfferInvoice;
 use App\Support\CompanySettings;
 use Spatie\LaravelPdf\Facades\Pdf;
@@ -28,15 +29,35 @@ class InvoicePdfService
 
     public function salesInvoice(SalesInvoice $invoice): PdfBuilder
     {
-        $invoice->load(['customer', 'warehouse', 'lines.item']);
-
-        return Pdf::view('pdf.sales-invoice', [
-            'invoice' => $invoice,
-            'company' => OurCompany::forCurrentUser(),
-            'hasDualUnit' => CompanySettings::hasDualUnit(),
-            'repDate' => now()->toDateString(),
-        ])
+        return Pdf::view('pdf.sales-invoice', $this->salesDocumentData($invoice))
             ->name("sales-invoice-{$invoice->id}.pdf")
+            ->download();
+    }
+
+    public function salesDispatchNote(SalesInvoice $invoice): PdfBuilder
+    {
+        return Pdf::view('pdf.sales-dispatch-note', $this->salesDocumentData($invoice))
+            ->name("sales-dispatch-note-{$invoice->id}.pdf")
+            ->download();
+    }
+
+    public function salesInvoicePrintSet(SalesInvoice $invoice): PdfBuilder
+    {
+        return Pdf::view('pdf.sales-invoice-print-set', $this->salesDocumentData($invoice))
+            ->name("sales-invoice-print-set-{$invoice->id}.pdf")
+            ->download();
+    }
+
+    public function salesWorkPrintSet(SalesInvoiceWork $work): PdfBuilder
+    {
+        $work->load(['customer', 'warehouse', 'lines.item']);
+
+        return Pdf::view('pdf.sales-invoice-print-set', [
+            ...$this->salesDocumentData($work),
+            'invoiceTitle' => 'فاتورة مبيعات (مسودة)',
+            'dispatchTitle' => 'إذن صرف بضاعة (مسودة)',
+        ])
+            ->name('sales-invoice-work-print-set.pdf')
             ->download();
     }
 
@@ -52,5 +73,20 @@ class InvoicePdfService
         ])
             ->name("sales-offer-invoice-{$invoice->id}.pdf")
             ->download();
+    }
+
+    /**
+     * @return array{invoice: SalesInvoice|SalesInvoiceWork, company: ?OurCompany, hasDualUnit: bool, repDate: string}
+     */
+    protected function salesDocumentData(SalesInvoice|SalesInvoiceWork $invoice): array
+    {
+        $invoice->loadMissing(['customer', 'warehouse', 'lines.item']);
+
+        return [
+            'invoice' => $invoice,
+            'company' => OurCompany::forCurrentUser(),
+            'hasDualUnit' => CompanySettings::hasDualUnit(),
+            'repDate' => now()->toDateString(),
+        ];
     }
 }

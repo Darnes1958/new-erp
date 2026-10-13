@@ -1,5 +1,5 @@
 <div>
-    @if ($company?->logoAbsolutePath())
+    @if (($showLogo ?? true) && $company?->logoAbsolutePath())
         <div style="margin-bottom: 6px;">
             <img src="{{ $company->logoAbsolutePath() }}" alt="" style="max-height: 70px; max-width: 180px;">
         </div>

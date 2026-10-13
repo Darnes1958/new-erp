@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseInvoice;
 use App\Models\SalesInvoice;
+use App\Models\SalesInvoiceWork;
 use App\Models\SalesOfferInvoice;
+use Illuminate\Support\Facades\Auth;
 use App\Services\Pdf\InvoicePdfService;
 use App\Services\Pdf\PurchaseInvoiceItemPricesPdfService;
 use Illuminate\Http\Response;
@@ -37,6 +39,31 @@ class InvoicePdfController extends Controller
         $invoice = SalesInvoice::query()->findOrFail($salesInvoice);
 
         return $this->pdfService->salesInvoice($invoice)->toResponse(request());
+    }
+
+    public function salesDispatchNote(int $salesInvoice): Response
+    {
+        $invoice = SalesInvoice::query()->findOrFail($salesInvoice);
+
+        return $this->pdfService->salesDispatchNote($invoice)->toResponse(request());
+    }
+
+    public function salesPrintSet(int $salesInvoice): Response
+    {
+        $invoice = SalesInvoice::query()->findOrFail($salesInvoice);
+
+        return $this->pdfService->salesInvoicePrintSet($invoice)->toResponse(request());
+    }
+
+    public function salesWorkPrintSet(): Response
+    {
+        $work = SalesInvoiceWork::query()->findOrFail(Auth::id());
+
+        if ($work->lines()->doesntExist()) {
+            abort(404);
+        }
+
+        return $this->pdfService->salesWorkPrintSet($work)->toResponse(request());
     }
 
     public function salesOffer(int $salesOfferInvoice): Response

@@ -4,11 +4,12 @@ namespace App\Filament\Market\Resources\SalesInvoices\Tables;
 
 use App\Filament\Market\Resources\SalesInvoices\Pages\EditSell;
 use App\Filament\Market\Resources\SalesInvoices\Pages\SalesReturnEntry;
+use App\Filament\Market\Support\SalesInvoiceDispatchPrintAction;
+use App\Filament\Market\Support\SalesInvoiceViewModalAction;
 use App\Models\SalesInvoice;
 use App\Services\Inventory\SalesInvoiceCancelService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
@@ -87,13 +88,14 @@ class SalesInvoicesTable
                     }),
             ])
             ->recordActions([
-                ViewAction::make()->iconButton(),
+                SalesInvoiceViewModalAction::make(),
                 Action::make('print')
                     ->label('طباعة')
                     ->icon('heroicon-o-printer')
                     ->iconButton()
                     ->url(fn ($record): string => route('pdf.sales-invoice', ['salesInvoice' => $record]))
                     ->openUrlInNewTab(),
+                SalesInvoiceDispatchPrintAction::make(),
                 Action::make('edit_sell')
                     ->label('تعديل')
                     ->icon('heroicon-m-pencil')

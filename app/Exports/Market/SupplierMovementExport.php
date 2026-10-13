@@ -3,10 +3,10 @@
 namespace App\Exports\Market;
 
 use App\Exports\Installments\Concerns\RtlInstallmentSheet;
+use App\Exports\Market\Concerns\ColorsSignedExcelBalances;
 use App\Models\OurCompany;
 use App\Models\SupplierLedgerEntry;
 use App\Services\Market\SupplierLedgerReportService;
-use App\Support\ErpNumber;
 use App\Support\Utf8Text;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -19,6 +19,7 @@ use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
 class SupplierMovementExport implements FromCollection, WithHeadings, WithMapping, WithEvents
 {
+    use ColorsSignedExcelBalances;
     use RtlInstallmentSheet;
 
     private const HEADER_ROW = 8;
@@ -100,10 +101,6 @@ class SupplierMovementExport implements FromCollection, WithHeadings, WithMappin
                 $infoRows = [
                     4 => 'كشف حساب المورد : '.Utf8Text::clean($this->supplierName),
                     5 => 'من تاريخ : '.$this->dateFrom,
-                    6 => 'الرصيد السابق : '.ErpNumber::money($this->openingBalance),
-                    7 => 'مدين : '.ErpNumber::money($this->periodTotals['debit'])
-                        .'    دائن : '.ErpNumber::money($this->periodTotals['credit'])
-                        .'    الرصيد : '.ErpNumber::money($this->periodTotals['balance']),
                 ];
 
                 foreach ($infoRows as $row => $text) {
@@ -120,6 +117,26 @@ class SupplierMovementExport implements FromCollection, WithHeadings, WithMappin
                         $sheet->getStyle("A{$row}")->getFont()->setBold(true);
                     }
                 }
+
+                $sheet->mergeCells('A6:G6');
+                $sheet->getCell('A6')->setValue($this->signedSummaryRichText([
+                    ['label' => 'الرصيد السابق : ', 'value' => $this->openingBalance],
+                ]));
+                $sheet->getStyle('A6')
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT)
+                    ->setVertical(Alignment::VERTICAL_CENTER);
+
+                $sheet->mergeCells('A7:G7');
+                $sheet->getCell('A7')->setValue($this->signedSummaryRichText([
+                    ['label' => 'مدين : ', 'value' => (float) $this->periodTotals['debit'], 'signed' => false],
+                    ['label' => 'دائن : ', 'value' => (float) $this->periodTotals['credit'], 'signed' => false],
+                    ['label' => 'الرصيد : ', 'value' => (float) $this->periodTotals['balance']],
+                ]));
+                $sheet->getStyle('A7')
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT)
+                    ->setVertical(Alignment::VERTICAL_CENTER);
 
                 $rowIndex = self::DATA_START_ROW;
 
@@ -145,6 +162,8 @@ class SupplierMovementExport implements FromCollection, WithHeadings, WithMappin
                             ->getAlignment()
                             ->setHorizontal(Alignment::HORIZONTAL_CENTER);
                     }
+
+                    $this->colorRunningBalanceColumn($sheet, $this->rows, 'F', self::DATA_START_ROW);
                 }
             },
         ];

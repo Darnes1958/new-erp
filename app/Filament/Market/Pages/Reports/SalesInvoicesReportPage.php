@@ -4,8 +4,9 @@ namespace App\Filament\Market\Pages\Reports;
 
 use App\Filament\Ins\Support\InstallmentListPrintActions;
 use App\Filament\Market\Pages\Reports\Concerns\RendersInvoiceReportContent;
-use App\Filament\Market\Resources\SalesInvoices\SalesInvoiceResource;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Market\Support\SalesInvoiceDispatchPrintAction;
+use App\Filament\Market\Support\SalesInvoiceViewModalAction;
 use App\Models\Customer;
 use App\Models\SalesInvoice;
 use App\Models\Warehouse;
@@ -16,7 +17,6 @@ use App\Support\PdfDownload;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -263,15 +263,13 @@ class SalesInvoicesReportPage extends Page implements HasActions, HasForms, HasT
                     ]),
             ])
             ->recordActions([
-                ViewAction::make()
-                    ->label('عرض')
-                    ->iconButton()
-                    ->url(fn (SalesInvoice $record): string => SalesInvoiceResource::getUrl('view', ['record' => $record])),
+                SalesInvoiceViewModalAction::make(),
                 Action::make('print')
                     ->icon('heroicon-o-printer')
                     ->iconButton()
                     ->url(fn (SalesInvoice $record): string => route('pdf.sales-invoice', ['salesInvoice' => $record->id]))
                     ->openUrlInNewTab(),
+                SalesInvoiceDispatchPrintAction::make(),
             ])
             ->emptyStateHeading('لا توجد فواتير')
             ->paginated([10, 25, 50, 100]);

@@ -31,6 +31,12 @@ Route::middleware('auth')->group(function (): void {
         ->name('pdf.purchase-invoice-item-prices');
     Route::get('/pdf/sales-invoice/{salesInvoice}', [InvoicePdfController::class, 'sales'])
         ->name('pdf.sales-invoice');
+    Route::get('/pdf/sales-invoice/{salesInvoice}/dispatch-note', [InvoicePdfController::class, 'salesDispatchNote'])
+        ->name('pdf.sales-dispatch-note');
+    Route::get('/pdf/sales-invoice/{salesInvoice}/print-set', [InvoicePdfController::class, 'salesPrintSet'])
+        ->name('pdf.sales-invoice-print-set');
+    Route::get('/pdf/sales-invoice-work/print-set', [InvoicePdfController::class, 'salesWorkPrintSet'])
+        ->name('pdf.sales-work-print-set');
     Route::get('/pdf/sales-offer-invoice/{salesOfferInvoice}', [InvoicePdfController::class, 'salesOffer'])
         ->name('pdf.sales-offer-invoice');
     Route::get('/pdf/warehouse-transfer/{warehouseTransfer}', WarehouseTransferPdfController::class)

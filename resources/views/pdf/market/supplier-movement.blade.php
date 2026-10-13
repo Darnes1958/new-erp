@@ -10,7 +10,7 @@
     </div>
 
     <div style="text-align: center; margin-bottom: 8px;">
-        <label style="font-size: 12pt;">الرصيد السابق : {{ \App\Support\ErpNumber::money($openingBalance) }}</label>
+        <label style="font-size: 12pt;">الرصيد السابق : {!! \App\Support\ErpNumber::moneySignedHtml($openingBalance) !!}</label>
     </div>
 
     <div style="text-align: center; margin-bottom: 12px;">
@@ -19,7 +19,7 @@
             &nbsp;&nbsp;
             دائن : {{ \App\Support\ErpNumber::money($periodTotals['credit']) }}
             &nbsp;&nbsp;
-            الرصيد : {{ \App\Support\ErpNumber::money($periodTotals['balance']) }}
+            الرصيد : {!! \App\Support\ErpNumber::moneySignedHtml($periodTotals['balance']) !!}
         </label>
     </div>
 
@@ -45,7 +45,7 @@
                 <td>{{ \App\Support\Utf8Text::clean($row->payment_method_name) }}</td>
                 <td style="text-align: center;">{{ \App\Support\ErpNumber::money($row->mden) }}</td>
                 <td style="text-align: center;">{{ \App\Support\ErpNumber::money($row->daen) }}</td>
-                <td style="text-align: center;">{{ \App\Support\ErpNumber::money($row->running_balance ?? 0) }}</td>
+                <td style="text-align: center;">{!! \App\Support\ErpNumber::moneySignedHtml($row->running_balance ?? 0) !!}</td>
                 <td>{{ \App\Support\Utf8Text::clean($row->notes) }}</td>
             </tr>
         @endforeach

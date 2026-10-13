@@ -10,6 +10,7 @@ use App\Models\SupplierLedgerEntry;
 use App\Services\Excel\MarketExcelService;
 use App\Services\Market\SupplierLedgerReportService;
 use App\Services\Pdf\SupplierLedgerPdfService;
+use App\Support\ErpNumber;
 use App\Support\PdfDownload;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -130,13 +131,9 @@ class SupplierMovementReportPage extends Page implements HasActions, HasForms, H
                                     ->content(fn (): string => number_format($service->lifetimeTotals($this->supplierId)['credit'], 3, '.', ',')),
                                 Placeholder::make('lifetimeBalance')
                                     ->label('الرصيد')
-                                    ->content(function () use ($service): HtmlString|string {
-                                        $balance = $service->lifetimeTotals($this->supplierId)['balance'];
-
-                                        return $balance < 0
-                                            ? new HtmlString('<span class="text-danger-600">'.number_format($balance, 3, '.', ',').'</span>')
-                                            : new HtmlString('<span class="text-indigo-700">'.number_format($balance, 3, '.', ',').'</span>');
-                                    }),
+                                    ->content(fn (): HtmlString => ErpNumber::signedHtml(
+                                        $service->lifetimeTotals($this->supplierId)['balance']
+                                    )),
                                 Placeholder::make('period_heading')
                                     ->hiddenLabel()
                                     ->content('الرصيد خلال الفترة')
@@ -149,13 +146,9 @@ class SupplierMovementReportPage extends Page implements HasActions, HasForms, H
                                     ->content(fn (): string => number_format($service->periodTotals($this->supplierId, $this->dateFrom)['credit'], 3, '.', ',')),
                                 Placeholder::make('periodBalance')
                                     ->label('الرصيد')
-                                    ->content(function () use ($service): HtmlString|string {
-                                        $balance = $service->periodTotals($this->supplierId, $this->dateFrom)['balance'];
-
-                                        return $balance < 0
-                                            ? new HtmlString('<span class="text-danger-600">'.number_format($balance, 3, '.', ',').'</span>')
-                                            : new HtmlString('<span class="text-indigo-700">'.number_format($balance, 3, '.', ',').'</span>');
-                                    }),
+                                    ->content(fn (): HtmlString => ErpNumber::signedHtml(
+                                        $service->periodTotals($this->supplierId, $this->dateFrom)['balance']
+                                    )),
                             ])
                             ->columns(4),
                     ])
@@ -186,7 +179,9 @@ class SupplierMovementReportPage extends Page implements HasActions, HasForms, H
 
         return $table
             ->query(fn (): Builder => $this->buildReportQuery())
-            ->heading(fn (): string => 'الرصيد السابق: '.number_format($service->openingBalance($this->supplierId, $this->dateFrom), 3, '.', ','))
+            ->heading(fn (): HtmlString => new HtmlString(
+                'الرصيد السابق: '.ErpNumber::signedHtml($service->openingBalance($this->supplierId, $this->dateFrom))
+            ))
             ->columns([
                 TextColumn::make('rep_date')
                     ->label('التاريخ')
@@ -208,7 +203,8 @@ class SupplierMovementReportPage extends Page implements HasActions, HasForms, H
                     ->color('info'),
                 TextColumn::make('running_balance')
                     ->label('الرصيد')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->color(fn ($state): string => (float) $state >= 0 ? 'success' : 'danger'),
                 TextColumn::make('notes')
                     ->label('ملاحظات')
                     ->limit(40),

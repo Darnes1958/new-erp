@@ -5,11 +5,13 @@ namespace App\Filament\Market\Pages\Reports;
 use App\Filament\Ins\Support\InstallmentListPrintActions;
 use App\Filament\Market\Pages\Reports\Concerns\InteractsWithMarketReportExports;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Market\Support\SalesInvoiceViewModalAction;
 use App\Models\Customer;
 use App\Models\CustomerLedgerEntry;
 use App\Services\Excel\MarketExcelService;
 use App\Services\Market\CustomerLedgerReportService;
 use App\Services\Pdf\CustomerLedgerPdfService;
+use App\Support\ErpNumber;
 use App\Support\PdfDownload;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -130,13 +132,9 @@ class CustomerMovementReportPage extends Page implements HasActions, HasForms, H
                                     ->content(fn (): string => number_format($service->lifetimeTotals($this->customerId)['credit'], 3, '.', ',')),
                                 Placeholder::make('lifetimeBalance')
                                     ->label('الرصيد')
-                                    ->content(function () use ($service): HtmlString|string {
-                                        $balance = $service->lifetimeTotals($this->customerId)['balance'];
-
-                                        return $balance < 0
-                                            ? new HtmlString('<span class="text-danger-600">'.number_format($balance, 3, '.', ',').'</span>')
-                                            : new HtmlString('<span class="text-indigo-700">'.number_format($balance, 3, '.', ',').'</span>');
-                                    }),
+                                    ->content(fn (): HtmlString => ErpNumber::signedHtml(
+                                        $service->lifetimeTotals($this->customerId)['balance']
+                                    )),
                                 Placeholder::make('period_heading')
                                     ->hiddenLabel()
                                     ->content('الرصيد خلال الفترة')
@@ -149,13 +147,9 @@ class CustomerMovementReportPage extends Page implements HasActions, HasForms, H
                                     ->content(fn (): string => number_format($service->periodTotals($this->customerId, $this->dateFrom)['credit'], 3, '.', ',')),
                                 Placeholder::make('periodBalance')
                                     ->label('الرصيد')
-                                    ->content(function () use ($service): HtmlString|string {
-                                        $balance = $service->periodTotals($this->customerId, $this->dateFrom)['balance'];
-
-                                        return $balance < 0
-                                            ? new HtmlString('<span class="text-danger-600">'.number_format($balance, 3, '.', ',').'</span>')
-                                            : new HtmlString('<span class="text-indigo-700">'.number_format($balance, 3, '.', ',').'</span>');
-                                    }),
+                                    ->content(fn (): HtmlString => ErpNumber::signedHtml(
+                                        $service->periodTotals($this->customerId, $this->dateFrom)['balance']
+                                    )),
                             ])
                             ->columns(4),
                     ])
@@ -186,7 +180,9 @@ class CustomerMovementReportPage extends Page implements HasActions, HasForms, H
 
         return $table
             ->query(fn (): Builder => $this->buildReportQuery())
-            ->heading(fn (): string => 'الرصيد السابق: '.number_format($service->openingBalance($this->customerId, $this->dateFrom), 3, '.', ','))
+            ->heading(fn (): HtmlString => new HtmlString(
+                'الرصيد السابق: '.ErpNumber::signedHtml($service->openingBalance($this->customerId, $this->dateFrom))
+            ))
             ->columns([
                 TextColumn::make('rep_date')
                     ->label('التاريخ')
@@ -208,16 +204,20 @@ class CustomerMovementReportPage extends Page implements HasActions, HasForms, H
                     ->color('info'),
                 TextColumn::make('running_balance')
                     ->label('الرصيد')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->color(fn ($state): string => (float) $state >= 0 ? 'success' : 'danger'),
                 TextColumn::make('notes')
                     ->label('ملاحظات')
                     ->limit(40),
             ])
             ->recordActions([
-                Action::make('viewInvoice')
-                    ->label('عرض')
-                    ->icon('heroicon-o-eye')
+                SalesInvoiceViewModalAction::make('viewInvoice')
+                    ->visible(fn (CustomerLedgerEntry $record): bool => (int) $record->transaction_kind === 7),
+                Action::make('printInvoice')
+                    ->label('طباعة')
+                    ->icon('heroicon-o-printer')
                     ->iconButton()
+                    ->tooltip('طباعة')
                     ->visible(fn (CustomerLedgerEntry $record): bool => (int) $record->transaction_kind === 7)
                     ->url(fn (CustomerLedgerEntry $record): string => route('pdf.sales-invoice', ['salesInvoice' => $record->id]))
                     ->openUrlInNewTab(),
