@@ -23,14 +23,14 @@ class ListInstallmentContracts extends ListRecords
                 ->color('danger')
                 ->url(fn (): string => CreateInstallmentContract::getUrl())
                 ->visible(fn (): bool => (Auth::user()?->can('ادخال عقود') || Auth::user()?->is_prog)
-                    && CompanySettings::linkSalesToInstallments()),
+                    ),
             Action::make('mergeContract')
                 ->label('ضم عقد')
                 ->icon('heroicon-m-document-duplicate')
                 ->color('warning')
                 ->url(fn (): string => MergeInstallmentContract::getUrl())
                 ->visible(fn (): bool => (Auth::user()?->can('ادخال عقود') || Auth::user()?->is_prog)
-                    && CompanySettings::linkSalesToInstallments()),
+                    ),
         ];
     }
 }
