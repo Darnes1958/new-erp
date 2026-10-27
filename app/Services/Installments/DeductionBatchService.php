@@ -235,6 +235,64 @@ class DeductionBatchService
         ]);
     }
 
+    public function rematchWrongLines(DeductionBatch $batch): int
+    {
+        if (! $batch->isOpen()) {
+            return 0;
+        }
+
+        $count = 0;
+
+        foreach ($batch->lines()->where('entry_type', DeductionBatchEntryType::Wrong)->get() as $line) {
+            $resolved = $this->resolveWrongLineContract($batch, (string) $line->account_number, (float) $line->amount);
+
+            if ($resolved === null) {
+                continue;
+            }
+
+            $contract = $resolved['contract'];
+
+            $line->forceFill([
+                'contractable_type' => $contract->getMorphClass(),
+                'contractable_id' => $contract->getKey(),
+                'account_number' => $contract->bank_account_number ?: $line->account_number,
+                'entry_type' => $resolved['entry_type'],
+            ])->save();
+
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * @return array{contract: Model, entry_type: DeductionBatchEntryType}|null
+     */
+    protected function resolveWrongLineContract(DeductionBatch $batch, string $accountNumber, float $amount): ?array
+    {
+        try {
+            return $this->resolveContract($batch, $accountNumber);
+        } catch (ValidationException $exception) {
+            $messages = $exception->errors();
+
+            if (isset($messages['installment_contract_id'])) {
+                $active = $this->activeContractsForAccount($batch, $accountNumber);
+                $matched = $active->first(
+                    fn (Model $contract): bool => abs((float) $contract->installment_amount - $amount) < 0.001,
+                ) ?? $active->first();
+
+                if ($matched) {
+                    return [
+                        'contract' => $matched,
+                        'entry_type' => DeductionBatchEntryType::Active,
+                    ];
+                }
+            }
+
+            return null;
+        }
+    }
+
     public function addWrongLine(
         DeductionBatch $batch,
         string $accountNumber,

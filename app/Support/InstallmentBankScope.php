@@ -11,8 +11,8 @@ use Illuminate\Validation\ValidationException;
  * Company installment bank policy:
  *
  * - Aggregative (installment_by_payroll_bank = true):
- *   Each payroll bank has exactly one branch; batches are opened for the
- *   payroll bank and entry runs through that linked branch.
+ *   Batches are opened for the payroll bank and matching covers every
+ *   branch that belongs to that payroll bank.
  *
  * - Branch (installment_by_payroll_bank = false):
  *   Each payroll bank may have many branches; batches and deductions are
@@ -85,19 +85,9 @@ class InstallmentBankScope
 
     public static function applyScope(Builder $query, ?int $payrollBankId, ?int $installmentBankId): void
     {
-        $connection = $query->getModel()->getConnectionName();
-
         if (self::usesPayrollSelection()) {
             if ($payrollBankId) {
                 $query->where('payroll_bank_id', $payrollBankId);
-
-                $branch = $installmentBankId
-                    ? ($connection ? InstallmentBank::on($connection)->find($installmentBankId) : InstallmentBank::query()->find($installmentBankId))
-                    : self::branchForPayroll($payrollBankId, $connection);
-
-                if ($branch) {
-                    $query->where('installment_bank_id', $branch->id);
-                }
             }
 
             return;

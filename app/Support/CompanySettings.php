@@ -48,7 +48,7 @@ class CompanySettings
         return (bool) static::current()?->link_sales_to_installments;
     }
 
-    /** @see InstallmentBankScope Policy: aggregative = one branch per payroll; branch = many branches per payroll */
+    /** @see InstallmentBankScope Policy: aggregative = all branches of a payroll bank; branch = one installment bank */
     public static function installmentByPayrollBank(): bool
     {
         return static::current()?->installment_by_payroll_bank ?? true;

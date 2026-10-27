@@ -75,6 +75,17 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
         $this->record = $this->resolveRecord($record);
         $this->batch = $this->record->load(['payrollBank', 'installmentBank']);
         $this->lineData = $this->defaultLineData();
+
+        if ($this->batch->isOpen()) {
+            $rematched = app(DeductionBatchService::class)->rematchWrongLines($this->batch);
+
+            if ($rematched > 0) {
+                Notification::make()
+                    ->title('تمت مطابقة '.$rematched.' حساباً كانت مصنّفة بالخطأ')
+                    ->success()
+                    ->send();
+            }
+        }
     }
 
     public function lineForm(Schema $schema): Schema
