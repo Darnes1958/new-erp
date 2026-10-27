@@ -1,4 +1,15 @@
 <x-filament-panels::page>
+    <style>
+        .deduction-batch-numbered-pagination .fi-pagination:not(.fi-simple) .fi-pagination-previous-btn,
+        .deduction-batch-numbered-pagination .fi-pagination:not(.fi-simple) .fi-pagination-next-btn {
+            display: none !important;
+        }
+
+        .deduction-batch-numbered-pagination .fi-pagination-items {
+            display: flex !important;
+            flex-wrap: wrap;
+        }
+    </style>
     <div
         style="display: grid; grid-template-columns: minmax(320px, 5fr) minmax(0, 7fr); gap: 1.5rem; direction: rtl; width: 100%;"
     >

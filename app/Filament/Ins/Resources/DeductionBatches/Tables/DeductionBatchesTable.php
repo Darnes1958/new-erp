@@ -56,7 +56,7 @@ class DeductionBatchesTable
                     ->label('الحالة')
                     ->badge(),
                 TextColumn::make('posted_normal_amount')
-                    ->label('مرحّل')
+                    ->label('مرحلة')
                     ->numeric(3)
                     ->toggleable(),
                 TextColumn::make('posted_surplus_amount')
@@ -73,6 +73,10 @@ class DeductionBatchesTable
                     ->toggleable(),
                 TextColumn::make('wrong_amount')
                     ->label('بالخطأ')
+                    ->numeric(3)
+                    ->toggleable(),
+                TextColumn::make('posted_cancelled_amount')
+                    ->label('ملغية')
                     ->numeric(3)
                     ->toggleable(),
             ])

@@ -17,12 +17,12 @@ enum DeductionBatchPostedType: int implements HasColor, HasLabel
     public function getLabel(): ?string
     {
         return match ($this) {
-            self::Normal => 'مرحّل',
-            self::Archive => 'فائض أرشيف',
+            self::Normal => 'مرحلة',
+            self::Archive => 'أرشيف',
             self::Surplus => 'فائض',
             self::Partial => 'جزئي',
             self::Wrong => 'بالخطأ',
-            self::Cancelled => 'ملغي',
+            self::Cancelled => 'ملغية',
         };
     }
 
@@ -35,6 +35,18 @@ enum DeductionBatchPostedType: int implements HasColor, HasLabel
             self::Surplus => 'primary',
             self::Wrong => 'gray',
             self::Cancelled => 'warning',
+        };
+    }
+
+    public function viewerColor(): string
+    {
+        return match ($this) {
+            self::Normal => '#16a34a',
+            self::Archive => '#dc2626',
+            self::Surplus => '#2563eb',
+            self::Partial => '#d97706',
+            self::Wrong => '#6b7280',
+            self::Cancelled => '#b45309',
         };
     }
 }

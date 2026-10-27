@@ -11,7 +11,9 @@ use App\Models\DeductionBatchLine;
 use App\Models\InstallmentContract;
 use App\Models\WrongDeductionAccount;
 use App\Services\Installments\BankAccountSearchService;
+use App\Enums\DeductionBatchPostedType;
 use App\Services\Installments\DeductionBatchService;
+use App\Services\Installments\DeductionBatchTypeBreakdown;
 use App\Services\Installments\WrongDeductionAccountService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -33,6 +35,8 @@ use App\Support\Filament\TableSummaries;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -279,6 +283,9 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
     {
         return $table
             ->query(fn (): Builder => DeductionBatchLine::query()->where('deduction_batch_id', $this->batch->id))
+            ->heading(fn (): HtmlString => $this->typeBreakdownHtml())
+            ->extraAttributes(['class' => 'deduction-batch-numbered-pagination'])
+            ->extremePaginationLinks()
             ->defaultSort('deduction_date', 'desc')
             ->columns([
                 TextColumn::make('contractable_id')
@@ -290,6 +297,13 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                 TextColumn::make('contractable.customer.name')
                     ->label('الزبون')
                     ->placeholder(fn (DeductionBatchLine $record): ?string => $record->entry_type === DeductionBatchEntryType::Wrong ? $record->notes : null),
+                TextColumn::make('display_type')
+                    ->label('النوع')
+                    ->badge()
+                    ->getStateUsing(fn (DeductionBatchLine $record): ?DeductionBatchPostedType => DeductionBatchTypeBreakdown::displayType(
+                        $record->posted_type,
+                        $record->entry_type,
+                    )),
                 TextColumn::make('amount')
                     ->label('القسط')
                     ->numeric(3)
@@ -302,6 +316,56 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                     ->label('ملاحظات')
                     ->toggleable()
                     ->toggledHiddenByDefault(),
+            ])
+            ->filters([
+                SelectFilter::make('display_type')
+                    ->label('نوع الخصم')
+                    ->options(DeductionBatchPostedType::class)
+                    ->query(function (Builder $query, array $data): Builder {
+                        $type = DeductionBatchPostedType::tryFrom((int) ($data['value'] ?? 0));
+
+                        if ($type === null) {
+                            return $query;
+                        }
+
+                        $unpostedEntry = match ($type) {
+                            DeductionBatchPostedType::Normal => DeductionBatchEntryType::Active,
+                            DeductionBatchPostedType::Archive => DeductionBatchEntryType::Archive,
+                            DeductionBatchPostedType::Wrong => DeductionBatchEntryType::Wrong,
+                            DeductionBatchPostedType::Cancelled => DeductionBatchEntryType::Cancelled,
+                            default => null,
+                        };
+
+                        return $query->where(function (Builder $query) use ($type, $unpostedEntry): void {
+                            $query->where('posted_type', $type->value);
+
+                            if ($unpostedEntry !== null) {
+                                $query->orWhere(function (Builder $query) use ($unpostedEntry): void {
+                                    $query->whereNull('posted_type')
+                                        ->where('entry_type', $unpostedEntry->value);
+                                });
+                            }
+                        });
+                    }),
+                Filter::make('deduction_date')
+                    ->label('التاريخ')
+                    ->schema([
+                        DatePicker::make('date_from')
+                            ->label('من تاريخ'),
+                        DatePicker::make('date_to')
+                            ->label('إلى تاريخ'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['date_from'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('deduction_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['date_to'] ?? null,
+                                fn (Builder $query, $date): Builder => $query->whereDate('deduction_date', '<=', $date),
+                            );
+                    }),
             ])
             ->recordActions([
                 Action::make('deleteLine')
@@ -316,6 +380,13 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                         Notification::make()->title('تم الحذف')->success()->send();
                     }),
             ]);
+    }
+
+    public function typeBreakdownHtml(): HtmlString
+    {
+        return DeductionBatchTypeBreakdown::html(
+            DeductionBatchTypeBreakdown::forBatch($this->batch)
+        );
     }
 
     public function resolveAccountFromEnter(): void
