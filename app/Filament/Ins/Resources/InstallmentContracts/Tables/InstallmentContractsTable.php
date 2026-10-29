@@ -7,13 +7,16 @@ use App\Filament\Ins\Resources\InstallmentContracts\InstallmentContractResource;
 use App\Filament\Ins\Support\InstallmentContractCancelAfterActions;
 use App\Filament\Ins\Support\InstallmentContractDeleteActions;
 use App\Filament\Ins\Support\InstallmentContractViewModalAction;
+use App\Models\InstallmentBank;
 use App\Models\InstallmentContract;
+use App\Models\PayrollBank;
 use App\Services\Installments\InstallmentStopService;
 use App\Support\CompanySettings;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\IconSize;
 use Filament\Tables\Columns\TextColumn;
@@ -63,9 +66,43 @@ class InstallmentContractsTable
             ->defaultSort('id', 'desc')
             ->striped()
             ->filters([
+                SelectFilter::make('payroll_bank_id')
+                    ->label('المصرف التجميعي')
+                    ->options(fn (): array => PayrollBank::query()->orderBy('name')->pluck('name', 'id')->all())
+                    ->searchable()
+                    ->preload()
+                    ->modifyFormFieldUsing(fn (Select $field): Select => $field
+                        ->live()
+                        ->afterStateUpdated(function ($livewire): void {
+                            if (is_object($livewire) && isset($livewire->tableFilters['installment_bank_id'])) {
+                                $livewire->tableFilters['installment_bank_id']['value'] = null;
+                            }
+                        })),
                 SelectFilter::make('installment_bank_id')
-                    ->label('المصرف')
-                    ->relationship('installmentBank', 'name'),
+                    ->label('فرع المصرف')
+                    ->options(function ($livewire): array {
+                        $payrollId = static::tableFilterValue($livewire, 'payroll_bank_id');
+
+                        if (blank($payrollId)) {
+                            return [];
+                        }
+
+                        return InstallmentBank::query()
+                            ->where('payroll_bank_id', (int) $payrollId)
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->all();
+                    })
+                    ->searchable()
+                    ->preload()
+                    ->placeholder('اختر المصرف التجميعي أولاً')
+                    ->modifyFormFieldUsing(function (Select $field, $livewire): Select {
+                        $payrollId = static::tableFilterValue($livewire, 'payroll_bank_id');
+
+                        return $field
+                            ->disabled(blank($payrollId))
+                            ->placeholder(blank($payrollId) ? 'اختر المصرف التجميعي أولاً' : 'الكل');
+                    }),
                 Filter::make('paid_off')
                     ->label('المسددة')
                     ->toggle()
@@ -167,6 +204,23 @@ class InstallmentContractsTable
         return $user?->is_prog
             || $user?->can('تعديل عقود')
             || $user?->can('ادخال عقود');
+    }
+
+    protected static function tableFilterValue(mixed $livewire, string $name): mixed
+    {
+        $state = null;
+
+        if (is_object($livewire) && method_exists($livewire, 'getTableFilterState')) {
+            $state = $livewire->getTableFilterState($name);
+        } elseif (is_object($livewire) && isset($livewire->tableFilters[$name])) {
+            $state = $livewire->tableFilters[$name];
+        }
+
+        if (is_array($state)) {
+            return $state['value'] ?? $state['isActive'] ?? null;
+        }
+
+        return $state;
     }
 
     protected static function isPaidOffFilterActive(mixed $livewire): bool
