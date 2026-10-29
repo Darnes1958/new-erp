@@ -116,9 +116,15 @@ class AppServiceProvider extends ServiceProvider
             'table.fields.search.placeholder' => 'بحث',
             'table.fields.search.indicator' => 'بحث',
             'table.actions.filter.label' => 'تصفية',
+            'table.selection_indicator.selected_count' => '{1} تم تحديد سجل واحد|{2} تم تحديد سجلين|[3,10] تم تحديد :count سجلات|[11,*] تم تحديد :count سجل',
+            'table.selection_indicator.actions.select_all.label' => 'تحديد الكل (:count)',
+            'table.selection_indicator.actions.deselect_all.label' => 'إلغاء تحديد الكل',
         ];
 
+        $translator = app('translator');
+
         foreach (array_unique(['ar', 'en', (string) config('app.locale')]) as $locale) {
+            $translator->load('filament-tables', 'table', $locale);
             Lang::addLines($filamentTableLines, $locale, 'filament-tables');
         }
 
