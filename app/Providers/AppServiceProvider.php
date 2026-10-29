@@ -95,7 +95,7 @@ class AppServiceProvider extends ServiceProvider
 
         Number::useLocale($numberLocale);
 
-        Lang::addLines([
+        $filamentTableLines = [
             'table.summary.heading' => '',
             'table.summary.subheadings.all' => '',
             'table.summary.subheadings.page' => '',
@@ -103,7 +103,24 @@ class AppServiceProvider extends ServiceProvider
             'table.summary.summarizers.sum.label' => '',
             'table.summary.summarizers.average.label' => '',
             'table.summary.summarizers.count.label' => '',
-        ], 'ar', 'filament-tables');
+            'table.filters.heading' => 'تصفية',
+            'table.filters.indicator' => 'التصفيات النشطة',
+            'table.filters.actions.apply.label' => 'تطبيق التصفية',
+            'table.filters.actions.reset.label' => 'إعادة تعيين',
+            'table.filters.actions.remove.label' => 'إزالة التصفية',
+            'table.filters.actions.remove_all.label' => 'إزالة كل التصفيات',
+            'table.filters.actions.remove_all.tooltip' => 'إزالة كل التصفيات',
+            'table.filters.select.placeholder' => 'الكل',
+            'table.filters.multi_select.placeholder' => 'الكل',
+            'table.fields.search.label' => 'بحث',
+            'table.fields.search.placeholder' => 'بحث',
+            'table.fields.search.indicator' => 'بحث',
+            'table.actions.filter.label' => 'تصفية',
+        ];
+
+        foreach (array_unique(['ar', 'en', (string) config('app.locale')]) as $locale) {
+            Lang::addLines($filamentTableLines, $locale, 'filament-tables');
+        }
 
         Table::configureUsing(fn (Table $table) => TableSummaries::applyDefaults($table)
             ->defaultNumberLocale($numberLocale)
