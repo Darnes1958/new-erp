@@ -92,11 +92,6 @@ class InstallmentContractArchiveService
                 ]);
 
             DB::connection($connection)
-                ->table('installment_stops')
-                ->where('installment_contract_id', $contract->id)
-                ->delete();
-
-            DB::connection($connection)
                 ->table('installment_cheques')
                 ->where('installment_contract_id', $contract->id)
                 ->delete();

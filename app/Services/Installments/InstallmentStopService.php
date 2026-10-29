@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class InstallmentStopService
 {
@@ -57,5 +58,42 @@ class InstallmentStopService
         return InstallmentStop::query()
             ->where('installment_contract_id', $contractId)
             ->exists();
+    }
+
+    /**
+     * @param  Collection<int, InstallmentContract>  $contracts
+     * @return array{stopped: int, archived: int, skipped_unpaid: int, errors: list<string>}
+     */
+    public function stopAndArchiveMany(Collection $contracts, Carbon|string $stopDate): array
+    {
+        $archiveService = app(InstallmentContractArchiveService::class);
+        $stopped = $this->stopMany($contracts, $stopDate);
+        $archived = 0;
+        $skippedUnpaid = 0;
+        $errors = [];
+
+        foreach ($contracts as $contract) {
+            $contract->refresh();
+
+            if ((float) $contract->balance > 0) {
+                $skippedUnpaid++;
+
+                continue;
+            }
+
+            try {
+                $archiveService->moveFromActive($contract);
+                $archived++;
+            } catch (ValidationException $exception) {
+                $errors[] = 'عقد '.$contract->id.': '.(collect($exception->errors())->flatten()->first() ?? 'تعذر النقل إلى الأرشيف');
+            }
+        }
+
+        return [
+            'stopped' => $stopped,
+            'archived' => $archived,
+            'skipped_unpaid' => $skippedUnpaid,
+            'errors' => $errors,
+        ];
     }
 }
