@@ -17,21 +17,13 @@ class CustomerReceiptService
     /** @return list<int> */
     public function collectionKinds(): array
     {
-        return [
-            ReceiptTransactionKind::Collection->value,
-            ReceiptTransactionKind::InvoiceCollection->value,
-            ReceiptTransactionKind::WithInvoiceCollection->value,
-        ];
+        return ReceiptTransactionKind::collectionValues();
     }
 
     /** @return list<int> */
     public function paymentKinds(): array
     {
-        return [
-            ReceiptTransactionKind::Payment->value,
-            ReceiptTransactionKind::InvoicePayment->value,
-            ReceiptTransactionKind::WithInvoicePayment->value,
-        ];
+        return ReceiptTransactionKind::paymentValues();
     }
 
     public function prepareAttributes(array $data): array
@@ -42,7 +34,7 @@ class CustomerReceiptService
 
         $paymentMethodId = (int) ($data['payment_method_id'] ?? 1);
 
-        $data['flow_direction'] = in_array($kind, $this->collectionKinds(), true) ? 0 : 1;
+        $data['flow_direction'] = ReceiptTransactionKind::from($kind)->defaultFlowDirection();
 
         if ($paymentMethodId === 1) {
             $data['bank_account_id'] = null;

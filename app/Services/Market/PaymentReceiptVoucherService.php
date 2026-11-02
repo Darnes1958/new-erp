@@ -3,6 +3,7 @@
 namespace App\Services\Market;
 
 use App\Enums\ReceiptListKind;
+use App\Enums\ReceiptTransactionKind;
 use App\Models\CustomerReceipt;
 use App\Models\SupplierPayment;
 use App\Support\ErpNumber;
@@ -35,7 +36,11 @@ class PaymentReceiptVoucherService
     {
         $record->loadMissing($kind->eagerLoads());
 
-        $isCollection = (int) $record->flow_direction === 0;
+        $isCollection = $record instanceof CustomerReceipt
+            ? ($record->transaction_kind instanceof ReceiptTransactionKind
+                ? $record->transaction_kind->isCollection()
+                : in_array((int) $record->transaction_kind, ReceiptTransactionKind::collectionValues(), true))
+            : (int) $record->flow_direction === 0;
         $partyName = Utf8Text::clean($this->partyName($record, $kind));
         $amount = (float) $record->amount;
 

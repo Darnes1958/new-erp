@@ -2,12 +2,16 @@
 
 namespace App\Services\Inventory;
 
+use App\Enums\ReceiptTransactionKind;
+use App\Models\CustomerReceipt;
 use App\Models\FifoAllocation;
 use App\Models\PurchaseInvoiceLine;
+use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceLine;
 use App\Models\SalesReturn;
 use App\Models\StockMovement;
 use App\Models\WarehouseStock;
+use App\Services\Payments\CustomerReceiptService;
 use App\Services\SystemOperationLogger;
 use App\Support\SystemOperationContext;
 use App\Support\SystemOperationType;
@@ -82,6 +86,11 @@ class SalesReturnService
             'sales_return_id' => $salesReturn->id,
         ]);
 
+        $invoice->refresh();
+        $invoice->recalculateTotals();
+        $this->createRefundReceipt($invoice, $salesReturn);
+        $this->syncInvoiceRefundAmount($invoice);
+
         return $salesReturn;
     }
 
@@ -126,6 +135,10 @@ class SalesReturnService
             'profit' => round((float) $line->profit + $profitDelta, 3),
         ]);
 
+        $invoice->refresh();
+        $invoice->recalculateTotals();
+        $this->deleteRefundReceipt($salesReturn);
+
         $invoiceId = $invoice->id;
         $context = SystemOperationContext::make(
             customerId: $invoice->customer_id ? (int) $invoice->customer_id : null,
@@ -133,6 +146,7 @@ class SalesReturnService
         );
 
         $salesReturn->delete();
+        $this->syncInvoiceRefundAmount($invoice);
 
         SystemOperationLogger::cancelled(SystemOperationType::SALE_RETURN, $invoiceId, $context);
     }
@@ -218,5 +232,89 @@ class SalesReturnService
             'movement_date' => $movementDate,
             'created_by' => Auth::id(),
         ]);
+    }
+
+    protected function createRefundReceipt(SalesInvoice $invoice, SalesReturn $salesReturn): void
+    {
+        $invoice->refresh();
+        $receiptService = app(CustomerReceiptService::class);
+
+        $collected = (float) CustomerReceipt::query()
+            ->where('sales_invoice_id', $invoice->id)
+            ->whereIn('transaction_kind', $receiptService->collectionKinds())
+            ->sum('amount');
+
+        $paidOut = (float) CustomerReceipt::query()
+            ->where('sales_invoice_id', $invoice->id)
+            ->whereIn('transaction_kind', $receiptService->paymentKinds())
+            ->sum('amount');
+
+        $refund = round(max(0, $collected - $paidOut - (float) $invoice->grand_total), 3);
+
+        if ($refund <= 0.0001) {
+            return;
+        }
+
+        $source = $this->sourceCollectionReceipt($invoice);
+        $paymentMethodId = (int) ($source?->payment_method_id ?: $invoice->payment_method_id ?: 1);
+
+        if (! in_array($paymentMethodId, [1, 2], true)) {
+            return;
+        }
+
+        $attributes = $receiptService->prepareAttributes([
+            'receipt_date' => $salesReturn->return_date,
+            'customer_id' => $invoice->customer_id,
+            'sales_invoice_id' => $invoice->id,
+            'sales_return_id' => $salesReturn->id,
+            'payment_method_id' => $paymentMethodId,
+            'transaction_kind' => ReceiptTransactionKind::WithInvoicePayment->value,
+            'amount' => $refund,
+            'cash_box_id' => $paymentMethodId === 1 ? $source?->cash_box_id : null,
+            'bank_account_id' => $paymentMethodId === 2 ? $source?->bank_account_id : null,
+            'warehouse_id' => $invoice->warehouse_id,
+            'notes' => 'ترجيع مبيعات — فاتورة رقم '.(string) $invoice->id,
+            'created_by' => Auth::id(),
+        ]);
+
+        $receipt = CustomerReceipt::query()->create($attributes);
+        $receiptService->afterSaved($receipt);
+    }
+
+    protected function deleteRefundReceipt(SalesReturn $salesReturn): void
+    {
+        $receipts = CustomerReceipt::query()
+            ->where('sales_return_id', $salesReturn->id)
+            ->get();
+
+        $receiptService = app(CustomerReceiptService::class);
+
+        foreach ($receipts as $receipt) {
+            $receipt->delete();
+            $receiptService->afterDeleted($receipt);
+        }
+    }
+
+    protected function sourceCollectionReceipt(SalesInvoice $invoice): ?CustomerReceipt
+    {
+        $receiptService = app(CustomerReceiptService::class);
+
+        return CustomerReceipt::query()
+            ->where('sales_invoice_id', $invoice->id)
+            ->whereIn('transaction_kind', $receiptService->collectionKinds())
+            ->whereNull('sales_return_id')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    protected function syncInvoiceRefundAmount(SalesInvoice $invoice): void
+    {
+        $returned = (float) SalesReturn::query()
+            ->where('sales_invoice_id', $invoice->id)
+            ->sum('line_total');
+
+        $invoice->forceFill([
+            'refund_amount' => $returned,
+        ])->saveQuietly();
     }
 }

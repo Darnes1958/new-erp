@@ -19,6 +19,11 @@ class EditSalesInvoice extends EditRecord
             ViewAction::make(),
             DeleteAction::make()
                 ->visible(fn (): bool => $this->record->canBeDeleted())
+                ->modalHeading('إلغاء فاتورة المبيعات')
+                ->modalDescription(fn (): string => $this->record->canCancelLinkedReceiptsWithInvoice() && $this->record->hasLinkedReceipts()
+                    ? 'هذه فاتورة مبيعات عامة مسددة. سيتم إلغاء إيصال القبض المرتبط بها مع الفاتورة في نفس العملية.'
+                    : 'هل أنت متأكد من إلغاء هذه الفاتورة؟')
+                ->modalSubmitActionLabel('تأكيد الإلغاء')
                 ->before(function (): void {
                     try {
                         $this->record->assertCanBeDeleted();

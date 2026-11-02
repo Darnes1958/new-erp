@@ -200,7 +200,7 @@ class QuickSell extends Page implements HasSchemas, HasTable
                         'sales_invoice_id' => $invoice->id,
                         'payment_method_id' => $this->work->payment_method_id,
                         'transaction_kind' => 6,
-                        'flow_direction' => 1,
+                        'flow_direction' => 0,
                         'amount' => $this->work->amount_paid,
                         'warehouse_id' => $warehouseId,
                         'cash_box_id' => $cashBoxId,

@@ -74,4 +74,37 @@ enum ReceiptTransactionKind: int implements HasColor, HasLabel
     {
         return in_array($kind, self::manualInvoiceReceiptValues(), true);
     }
+
+    public function isCollection(): bool
+    {
+        return match ($this) {
+            self::Collection, self::InvoiceCollection, self::WithInvoiceCollection => true,
+            default => false,
+        };
+    }
+
+    public function defaultFlowDirection(): int
+    {
+        return $this->isCollection() ? 0 : 1;
+    }
+
+    /** @return list<int> */
+    public static function collectionValues(): array
+    {
+        return [
+            self::Collection->value,
+            self::InvoiceCollection->value,
+            self::WithInvoiceCollection->value,
+        ];
+    }
+
+    /** @return list<int> */
+    public static function paymentValues(): array
+    {
+        return [
+            self::Payment->value,
+            self::InvoicePayment->value,
+            self::WithInvoicePayment->value,
+        ];
+    }
 }

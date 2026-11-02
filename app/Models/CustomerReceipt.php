@@ -11,6 +11,7 @@ class CustomerReceipt extends CompanyModel
         'receipt_date',
         'customer_id',
         'sales_invoice_id',
+        'sales_return_id',
         'payment_method_id',
         'transaction_kind',
         'flow_direction',
@@ -39,6 +40,11 @@ class CustomerReceipt extends CompanyModel
     public function salesInvoice(): BelongsTo
     {
         return $this->belongsTo(SalesInvoice::class);
+    }
+
+    public function salesReturn(): BelongsTo
+    {
+        return $this->belongsTo(SalesReturn::class);
     }
 
     public function paymentMethod(): BelongsTo

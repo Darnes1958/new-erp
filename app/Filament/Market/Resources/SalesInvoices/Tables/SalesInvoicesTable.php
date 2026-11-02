@@ -112,6 +112,11 @@ class SalesInvoicesTable
                 DeleteAction::make()
                     ->iconButton()
                     ->visible(fn (SalesInvoice $record): bool => $record->canBeDeleted())
+                    ->modalHeading('إلغاء فاتورة المبيعات')
+                    ->modalDescription(fn (SalesInvoice $record): string => $record->canCancelLinkedReceiptsWithInvoice() && $record->hasLinkedReceipts()
+                        ? 'هذه فاتورة مبيعات عامة مسددة. سيتم إلغاء إيصال القبض المرتبط بها مع الفاتورة في نفس العملية.'
+                        : 'هل أنت متأكد من إلغاء هذه الفاتورة؟')
+                    ->modalSubmitActionLabel('تأكيد الإلغاء')
                     ->before(function (SalesInvoice $record): void {
                         try {
                             $record->assertCanBeDeleted();

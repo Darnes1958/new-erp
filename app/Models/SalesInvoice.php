@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SalesInvoice extends CompanyModel
 {
+    public const GENERAL_CUSTOMER_ID = 1;
+
     protected $fillable = [
         'invoice_date',
         'customer_id',
@@ -128,11 +130,22 @@ class SalesInvoice extends CompanyModel
             return 'هذه الفاتورة مرتبطة بترجيعات .. لا يجوز الغاءها';
         }
 
-        if ($this->hasLinkedReceipts()) {
+        if ($this->hasLinkedReceipts() && ! $this->canCancelLinkedReceiptsWithInvoice()) {
             return 'هذه الفاتورة مرتبطة بإيصالات .. لا يجوز الغاءها';
         }
 
         return null;
+    }
+
+    public function isFullyPaidGeneralSale(): bool
+    {
+        return (int) $this->customer_id === self::GENERAL_CUSTOMER_ID
+            && (float) $this->balance <= 0;
+    }
+
+    public function canCancelLinkedReceiptsWithInvoice(): bool
+    {
+        return $this->isFullyPaidGeneralSale();
     }
 
     public function assertCanBeDeleted(): void

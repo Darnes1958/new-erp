@@ -241,8 +241,8 @@ class DailyMovementReportService
             ->when(filled($dateTo), fn (Builder $query): Builder => $query->whereDate('receipt_date', '<=', $dateTo))
             ->when(filled($warehouseId), fn (Builder $query): Builder => $query->where('warehouse_id', $warehouseId))
             ->select('cash_box_id')
-            ->selectRaw('SUM(CASE WHEN flow_direction = 0 THEN amount ELSE 0 END) as inflow_amount')
-            ->selectRaw('SUM(CASE WHEN flow_direction = 1 THEN amount ELSE 0 END) as outflow_amount')
+            ->selectRaw('SUM(CASE WHEN transaction_kind IN (1, 3, 6) THEN amount ELSE 0 END) as inflow_amount')
+            ->selectRaw('SUM(CASE WHEN transaction_kind IN (2, 4, 5) THEN amount ELSE 0 END) as outflow_amount')
             ->groupBy('cash_box_id');
 
         $supplierIn = SupplierPayment::query()
@@ -328,7 +328,7 @@ class DailyMovementReportService
             ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('receipt_date', '>=', $dateFrom))
             ->when(filled($dateTo), fn (Builder $query): Builder => $query->whereDate('receipt_date', '<=', $dateTo))
             ->when(filled($warehouseId), fn (Builder $query): Builder => $query->where('warehouse_id', $warehouseId))
-            ->where('flow_direction', 0)
+            ->whereIn('transaction_kind', ReceiptTransactionKind::collectionValues())
             ->sum('amount')
             + (float) SupplierPayment::query()
                 ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('payment_date', '>=', $dateFrom))
@@ -340,7 +340,7 @@ class DailyMovementReportService
             ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('receipt_date', '>=', $dateFrom))
             ->when(filled($dateTo), fn (Builder $query): Builder => $query->whereDate('receipt_date', '<=', $dateTo))
             ->when(filled($warehouseId), fn (Builder $query): Builder => $query->where('warehouse_id', $warehouseId))
-            ->where('flow_direction', 1)
+            ->whereIn('transaction_kind', ReceiptTransactionKind::paymentValues())
             ->sum('amount')
             + (float) SupplierPayment::query()
                 ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('payment_date', '>=', $dateFrom))
@@ -416,8 +416,12 @@ class DailyMovementReportService
             ->selectRaw('payment_methods.name as payment_method_name')
             ->selectRaw('bank_accounts.name as bank_account_name')
             ->selectRaw('cash_boxes.name as cash_box_name')
-            ->selectRaw("SUM(CASE WHEN {$table}.flow_direction = 0 THEN {$table}.amount ELSE 0 END) as collection_amount")
-            ->selectRaw("SUM(CASE WHEN {$table}.flow_direction = 1 THEN {$table}.amount ELSE 0 END) as payment_amount")
+            ->selectRaw($table === 'customer_receipts'
+                ? "SUM(CASE WHEN {$table}.transaction_kind IN (1, 3, 6) THEN {$table}.amount ELSE 0 END) as collection_amount"
+                : "SUM(CASE WHEN {$table}.flow_direction = 0 THEN {$table}.amount ELSE 0 END) as collection_amount")
+            ->selectRaw($table === 'customer_receipts'
+                ? "SUM(CASE WHEN {$table}.transaction_kind IN (2, 4, 5) THEN {$table}.amount ELSE 0 END) as payment_amount"
+                : "SUM(CASE WHEN {$table}.flow_direction = 1 THEN {$table}.amount ELSE 0 END) as payment_amount")
             ->groupBy("{$table}.transaction_kind", 'payment_methods.name', 'bank_accounts.name', 'cash_boxes.name');
     }
 }

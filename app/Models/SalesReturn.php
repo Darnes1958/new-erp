@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SalesReturn extends CompanyModel
 {
@@ -39,5 +40,10 @@ class SalesReturn extends CompanyModel
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class);
+    }
+
+    public function customerReceipt(): HasOne
+    {
+        return $this->hasOne(CustomerReceipt::class);
     }
 }

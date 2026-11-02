@@ -99,8 +99,8 @@ SELECT
         cr.id,
         cr.transaction_kind,
         pm.name,
-        CASE WHEN cr.flow_direction = 1 THEN cr.amount ELSE CAST(0 AS decimal(14, 3)) END,
-        CASE WHEN cr.flow_direction = 0 THEN cr.amount ELSE CAST(0 AS decimal(14, 3)) END,
+        CASE WHEN cr.transaction_kind IN (2, 4, 5) THEN cr.amount ELSE CAST(0 AS decimal(14, 3)) END,
+        CASE WHEN cr.transaction_kind IN (1, 3, 6) THEN cr.amount ELSE CAST(0 AS decimal(14, 3)) END,
         cr.notes,
         CAST(2 AS int),
         cr.id

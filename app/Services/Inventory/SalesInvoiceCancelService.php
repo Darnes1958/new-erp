@@ -4,6 +4,7 @@ namespace App\Services\Inventory;
 
 use App\Models\FifoAllocation;
 use App\Models\SalesInvoice;
+use App\Services\Payments\CustomerReceiptService;
 use App\Services\SystemOperationLogger;
 use App\Support\SystemOperationContext;
 use App\Support\SystemOperationType;
@@ -42,6 +43,15 @@ class SalesInvoiceCancelService
             FifoAllocation::query()
                 ->where('sales_invoice_id', $invoiceId)
                 ->delete();
+
+            if ($invoice->canCancelLinkedReceiptsWithInvoice()) {
+                $receiptService = app(CustomerReceiptService::class);
+
+                foreach ($invoice->receipts()->get() as $receipt) {
+                    $receipt->delete();
+                    $receiptService->afterDeleted($receipt);
+                }
+            }
 
             $invoice->delete();
 

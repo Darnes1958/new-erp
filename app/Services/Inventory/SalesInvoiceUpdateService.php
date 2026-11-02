@@ -314,6 +314,8 @@ class SalesInvoiceUpdateService
             'receipt_date' => $work->invoice_date,
             'customer_id' => $work->customer_id,
             'payment_method_id' => $work->payment_method_id,
+            'transaction_kind' => 6,
+            'flow_direction' => 0,
             'amount' => (float) $work->amount_paid,
             'warehouse_id' => $work->warehouse_id,
             'cash_box_id' => $cashBoxId,
@@ -331,8 +333,6 @@ class SalesInvoiceUpdateService
         CustomerReceipt::query()->create([
             ...$payload,
             'sales_invoice_id' => $invoice->id,
-            'transaction_kind' => 6,
-            'flow_direction' => 1,
             'created_by' => Auth::id(),
         ]);
 
