@@ -120,6 +120,17 @@ class QuickSell extends Page implements HasSchemas, HasTable
         }
 
         $cashBoxId = null;
+        $bankAccountId = null;
+
+        if ((float) $this->work->amount_paid > 0 && (int) $this->work->payment_method_id === 2) {
+            $bankAccountId = $this->storeData['bank_account_id'] ?? null;
+
+            if (! $bankAccountId) {
+                Notification::make()->title('يجب اختيار المصرف')->danger()->send();
+
+                return;
+            }
+        }
 
         if ((float) $this->work->amount_paid > 0 && (int) $this->work->payment_method_id === 1) {
             $cashBoxId = $this->storeData['cash_box_id'] ?? $this->defaultCashBoxId();
@@ -137,6 +148,7 @@ class QuickSell extends Page implements HasSchemas, HasTable
                 $lines,
                 $warehouseId,
                 $cashBoxId,
+                $bankAccountId,
             ): int {
                 $invoice = SalesInvoice::query()->create([
                     'invoice_date' => $this->work->invoice_date,
@@ -194,7 +206,7 @@ class QuickSell extends Page implements HasSchemas, HasTable
                         'amount' => $this->work->amount_paid,
                         'warehouse_id' => $warehouseId,
                         'cash_box_id' => $cashBoxId,
-                        'bank_account_id' => null,
+                        'bank_account_id' => $bankAccountId,
                         'notes' => 'فاتورة مبيعات رقم '.(string) $invoice->id,
                         'created_by' => Auth::id(),
                     ]);

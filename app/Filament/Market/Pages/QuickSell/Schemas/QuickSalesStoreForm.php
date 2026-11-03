@@ -2,6 +2,7 @@
 
 namespace App\Filament\Market\Pages\QuickSell\Schemas;
 
+use App\Models\BankAccount;
 use App\Models\CashBox;
 use App\Models\SalesInvoiceLineWork;
 use Filament\Actions\Action;
@@ -18,6 +19,12 @@ class QuickSalesStoreForm
             ->statePath('storeData')
             ->columns(1)
             ->components([
+                Select::make('bank_account_id')
+                    ->options(fn () => BankAccount::query()->where('is_active', true)->pluck('name', 'id'))
+                    ->label('المصرف')
+                    ->columnSpanFull()
+                    ->searchable()
+                    ->visible(fn () => (int) ($page->work->payment_method_id ?? 1) === 2),
                 Select::make('cash_box_id')
                     ->options(fn () => CashBox::query()->where('is_active', true)->pluck('name', 'id'))
                     ->label('الخزينة')
