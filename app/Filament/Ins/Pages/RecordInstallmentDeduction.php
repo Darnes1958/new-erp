@@ -82,11 +82,7 @@ class RecordInstallmentDeduction extends Page implements HasSchemas, HasTable
             return false;
         }
 
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return $user->can('ادخال عقود') || $user->can('تعديل عقود');
+        return \App\Support\Authz::can('ادخال عقود', 'تعديل عقود', 'ادخال اقساط');
     }
 
     public function mount(): void

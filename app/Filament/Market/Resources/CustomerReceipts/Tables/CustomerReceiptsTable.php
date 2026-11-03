@@ -107,14 +107,9 @@ class CustomerReceiptsTable
                         app(PaymentReceiptVoucherPdfService::class)->customerReceipt($record),
                     )),
                 EditAction::make()
-                    ->visible(fn (CustomerReceipt $record): bool => Auth::user()?->can('تعديل ايصالات زبائن') || Auth::user()?->is_prog),
+                    ->visible(fn (): bool => \App\Support\Authz::can('تعديل ايصالات زبائن', 'تعديل ايصالات قبض')),
                 DeleteAction::make()
-                    ->visible(fn (CustomerReceipt $record): bool => (
-                        (int) $record->transaction_kind->value < ReceiptTransactionKind::WithInvoicePayment->value
-                        || Auth::user()?->can('الغاء ايصالات زبائن')
-                        || Auth::user()?->can('االغاء ايصالات زبائن')
-                        || Auth::user()?->is_prog
-                    ))
+                    ->visible(fn (): bool => \App\Support\Authz::can('الغاء ايصالات زبائن', 'االغاء ايصالات زبائن', 'الغاء ايصالات قبض'))
                     ->after(function (CustomerReceipt $record): void {
                         app(CustomerReceiptService::class)->afterDeleted($record);
                     }),

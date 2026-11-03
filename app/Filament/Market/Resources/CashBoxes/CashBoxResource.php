@@ -22,11 +22,14 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use App\Filament\Support\AuthorizesErpResource;
+use App\Support\Authz;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class CashBoxResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = CashBox::class;
 
     protected static ?string $navigationLabel = 'خزائن';
@@ -41,16 +44,14 @@ class CashBoxResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-    public static function shouldRegisterNavigation(): bool
+    protected static function createPermissions(): array
     {
-        $user = Auth::user();
-
-        return $user?->is_prog || $user?->can('ادخال خزائن');
+        return ['ادخال خزينة', 'ادخال خزائن'];
     }
 
-    public static function canAccess(): bool
+    protected static function deletePermissions(): array
     {
-        return static::shouldRegisterNavigation();
+        return ['الغاء خزينة'];
     }
 
     public static function form(Schema $schema): Schema
@@ -98,7 +99,7 @@ class CashBoxResource extends Resource
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make()
-                    ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('الغاء خزينة'))
+                    ->visible(fn (): bool => Authz::can('الغاء خزينة'))
                     ->hidden(fn (CashBox $record): bool => CustomerReceipt::query()->where('cash_box_id', $record->id)->exists()
                         || SupplierPayment::query()->where('cash_box_id', $record->id)->exists()
                         || Expense::query()->where('cash_box_id', $record->id)->exists()

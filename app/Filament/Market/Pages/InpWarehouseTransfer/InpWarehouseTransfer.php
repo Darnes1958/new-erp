@@ -61,17 +61,7 @@ class InpWarehouseTransfer extends Page implements HasSchemas, HasTable
 
     public static function canAccess(): bool
     {
-        $user = Auth::user();
-
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return $user->can('نقل أصناف');
+        return \App\Support\Authz::can('نقل أصناف');
     }
 
     public function mount(): void

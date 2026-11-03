@@ -45,7 +45,7 @@ class EditFundTransfer extends EditRecord
     {
         return [
             DeleteAction::make()
-                ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('الغاء تحويل'))
+                ->visible(fn (): bool => \App\Support\Authz::can('الغاء تحويل'))
                 ->after(function (): void {
                     SystemOperationLogger::cancelled(SystemOperationType::FUND_TRANSFER, $this->record->id);
                 }),

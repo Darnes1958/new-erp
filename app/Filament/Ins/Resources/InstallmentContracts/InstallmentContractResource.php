@@ -36,7 +36,7 @@ class InstallmentContractResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->can('ادخال عقود') || $user?->is_prog;
+        return \App\Support\Authz::can('ادخال عقود', 'تعديل عقود', 'الغاء عقود', 'تقرير عن عقد', 'استفسار عقود فقط');
     }
 
     public static function canAccess(): bool
@@ -53,14 +53,14 @@ class InstallmentContractResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->can('تعديل عقود') || $user?->is_prog;
+        return \App\Support\Authz::can('تعديل عقود');
     }
 
     public static function canDelete(Model $record): bool
     {
         $user = Auth::user();
 
-        return $user?->can('الغاء عقود') || $user?->is_prog;
+        return \App\Support\Authz::can('الغاء عقود');
     }
 
     public static function infolist(Schema $schema): Schema

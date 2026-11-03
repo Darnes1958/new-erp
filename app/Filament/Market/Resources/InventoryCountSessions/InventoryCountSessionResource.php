@@ -39,7 +39,7 @@ class InventoryCountSessionResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->hasRole('admin');
+        return \App\Support\Authz::can('المخزون');
     }
 
     public static function canAccess(): bool

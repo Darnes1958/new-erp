@@ -33,16 +33,27 @@ class ExpenseResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('ادخال مصروفات');
+        return \App\Support\Authz::can('ادخال مصروفات', 'تعديل مصروفات', 'الغاء مصروفات');
     }
 
     public static function canAccess(): bool
     {
-        $user = Auth::user();
+        return static::shouldRegisterNavigation();
+    }
 
-        return $user?->is_prog
-            || $user?->can('ادخال مصروفات')
-            || $user?->can('الغاء مصروفات');
+    public static function canCreate(): bool
+    {
+        return \App\Support\Authz::can('ادخال مصروفات');
+    }
+
+    public static function canEdit($record): bool
+    {
+        return \App\Support\Authz::can('تعديل مصروفات', 'ادخال مصروفات');
+    }
+
+    public static function canDelete($record): bool
+    {
+        return \App\Support\Authz::can('الغاء مصروفات');
     }
 
     public static function form(Schema $schema): Schema

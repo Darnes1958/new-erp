@@ -8,14 +8,16 @@ use App\Filament\Market\Resources\SalesOfferInvoices\Pages\ViewSalesOfferInvoice
 use App\Filament\Market\Resources\SalesOfferInvoices\Schemas\SalesOfferInvoiceInfolist;
 use App\Filament\Market\Resources\SalesOfferInvoices\Tables\SalesOfferInvoicesTable;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Support\AuthorizesErpResource;
 use App\Models\SalesOfferInvoice;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class SalesOfferInvoiceResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = SalesOfferInvoice::class;
 
     protected static ?string $navigationLabel = 'فواتير العرض';
@@ -30,19 +32,24 @@ class SalesOfferInvoiceResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
-    public static function shouldRegisterNavigation(): bool
+    public static function canCreate(): bool
     {
-        $user = Auth::user();
+        return false;
+    }
 
-        if (! $user) {
-            return false;
-        }
+    protected static function createPermissions(): array
+    {
+        return ['ادخال مبيعات'];
+    }
 
-        if ($user->is_prog) {
-            return true;
-        }
+    protected static function editPermissions(): array
+    {
+        return ['تعديل مبيعات'];
+    }
 
-        return $user->can('تعديل مبيعات');
+    protected static function deletePermissions(): array
+    {
+        return ['الغاء مبيعات'];
     }
 
     public static function infolist(Schema $schema): Schema

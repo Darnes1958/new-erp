@@ -62,9 +62,7 @@ class RentMovementReportPage extends Page implements HasActions, HasForms, HasTa
     {
         $user = Auth::user();
 
-        return $user?->is_prog
-            || $user?->can('إيجارات')
-            || $user?->can('تقارير ايجارات');
+        return \App\Support\Authz::can('تقارير ايجارات', 'إيجارات');
     }
 
     public static function canAccess(): bool

@@ -34,7 +34,7 @@ class ExpenseTypeResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('ادخال مصروفات');
+        return \App\Support\Authz::can('ادخال مصروفات');
     }
 
     public static function form(Schema $schema): Schema

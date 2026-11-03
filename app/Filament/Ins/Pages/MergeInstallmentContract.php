@@ -58,7 +58,7 @@ class MergeInstallmentContract extends Page implements HasSchemas
             return false;
         }
 
-        return ($user->is_prog || $user->can('ادخال عقود')) && CompanySettings::linkSalesToInstallments();
+        return \App\Support\Authz::can('ضم عقد', 'ادخال عقود') && CompanySettings::linkSalesToInstallments();
     }
 
     public static function shouldRegisterNavigation(): bool

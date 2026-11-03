@@ -101,7 +101,7 @@ class ExpensesTable
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make()
-                    ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('الغاء مصروفات'))
+                    ->visible(fn (): bool => \App\Support\Authz::can('الغاء مصروفات'))
                     ->after(function (Expense $record): void {
                         SystemOperationLogger::cancelled(SystemOperationType::EXPENSE, $record->id);
                     }),

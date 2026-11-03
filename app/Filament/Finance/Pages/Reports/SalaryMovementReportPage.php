@@ -62,9 +62,7 @@ class SalaryMovementReportPage extends Page implements HasActions, HasForms, Has
     {
         $user = Auth::user();
 
-        return $user?->is_prog
-            || $user?->can('مرتبات')
-            || $user?->can('تقارير مرتبات');
+        return \App\Support\Authz::can('تقارير مرتبات', 'مرتبات', 'ادخال مرتبات');
     }
 
     public static function canAccess(): bool

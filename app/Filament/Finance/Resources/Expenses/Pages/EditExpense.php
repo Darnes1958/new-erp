@@ -24,7 +24,7 @@ class EditExpense extends EditRecord
     {
         return [
             DeleteAction::make()
-                ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('الغاء مصروفات'))
+                ->visible(fn (): bool => \App\Support\Authz::can('الغاء مصروفات'))
                 ->after(function (): void {
                     SystemOperationLogger::cancelled(SystemOperationType::EXPENSE, $this->record->id);
                 }),

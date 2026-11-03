@@ -34,7 +34,7 @@ class ViewInstallmentContractArchive extends ViewRecord implements HasTable
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->color('success')
                 ->requiresConfirmation()
-                ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('تقرير عن عقد من الارشيف'))
+                ->visible(fn (): bool => \App\Support\Authz::can('تقرير عن عقد من الارشيف'))
                 ->action(function (): void {
                     try {
                         $contract = app(InstallmentContractArchiveService::class)

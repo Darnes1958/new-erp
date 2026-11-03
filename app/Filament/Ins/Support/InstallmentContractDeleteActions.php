@@ -14,7 +14,7 @@ class InstallmentContractDeleteActions
 {
     public static function canDeleteByPermission(): bool
     {
-        return Auth::user()?->can('الغاء عقود') || Auth::user()?->is_prog;
+        return \App\Support\Authz::can('الغاء عقود');
     }
 
     public static function make(bool $iconButton = false, bool | Closure $visible = true, ?Closure $afterDelete = null): Action

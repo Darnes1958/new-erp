@@ -35,7 +35,7 @@ class InstallmentReturnResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('ادخال عقود') || $user?->can('تعديل عقود');
+        return \App\Support\Authz::can('ترجيع قسط', 'ادخال فائض وترجيع', 'ادخال عقود', 'تعديل عقود');
     }
 
     public static function form(Schema $schema): Schema

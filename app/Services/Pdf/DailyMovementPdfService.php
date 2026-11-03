@@ -3,6 +3,7 @@
 namespace App\Services\Pdf;
 
 use App\Models\OurCompany;
+use App\Support\Authz;
 use App\Services\Market\DailyMovementReportService;
 use Spatie\LaravelPdf\Facades\Pdf;
 use Spatie\LaravelPdf\PdfBuilder;
@@ -32,6 +33,7 @@ class DailyMovementPdfService
             'salaries' => $service->salariesDetailQuery($dateFrom, $dateTo, $warehouseId)->get(),
             'rents' => $service->rentsDetailQuery($dateFrom, $dateTo, $warehouseId)->get(),
             'service' => $service,
+            'showBuyPrices' => Authz::canViewBuyPrice(),
         ])->name('daily-movement-detail.pdf');
     }
 
@@ -60,6 +62,7 @@ class DailyMovementPdfService
             'purchaseReturns' => $service->purchaseReturnsByDateSummary($dateFrom, $dateTo, $warehouseId)->get(),
             'cashBoxes' => $service->cashBoxesSummary($dateFrom, $dateTo, $warehouseId)->get(),
             'service' => $service,
+            'showBuyPrices' => Authz::canViewBuyPrice(),
         ])->name('daily-movement-summary.pdf');
     }
 }

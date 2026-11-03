@@ -53,9 +53,7 @@ class CustomerContractsReportPage extends Page implements HasForms, HasTable
     {
         $user = Auth::user();
 
-        return $user?->is_prog
-            || $user?->can('تقرير عن عقد')
-            || $user?->can('تقرير عن عقد من الارشيف');
+        return \App\Support\Authz::can('تقرير عن عقد', 'تقرير عن عقد من الارشيف');
     }
 
     public static function canAccess(): bool
@@ -101,7 +99,7 @@ class CustomerContractsReportPage extends Page implements HasForms, HasTable
         return [
             'active' => Tab::make('قائمة'),
             'archive' => Tab::make('أرشيف')
-                ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('تقرير عن عقد من الارشيف')),
+                ->visible(fn (): bool => \App\Support\Authz::can('تقرير عن عقد من الارشيف')),
             'cancelled' => Tab::make('ملغاة'),
             'all' => Tab::make('الكل'),
         ];

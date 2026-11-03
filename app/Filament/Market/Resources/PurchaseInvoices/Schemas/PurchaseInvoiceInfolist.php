@@ -2,6 +2,7 @@
 
 namespace App\Filament\Market\Resources\PurchaseInvoices\Schemas;
 
+use App\Support\Authz;
 use App\Support\CompanySettings;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn;
@@ -59,11 +60,13 @@ class PurchaseInvoiceInfolist
             $schema[] = TextEntry::make('qty_secondary')->numeric(3);
         }
 
-        $tableColumns[] = TableColumn::make('السعر');
-        $schema[] = TextEntry::make('unit_cost_primary')->numeric(3);
+        if (Authz::canViewBuyPrice()) {
+            $tableColumns[] = TableColumn::make('السعر');
+            $schema[] = TextEntry::make('unit_cost_primary')->numeric(3);
 
-        $tableColumns[] = TableColumn::make('الإجمالي');
-        $schema[] = TextEntry::make('line_cost_total')->numeric(3);
+            $tableColumns[] = TableColumn::make('الإجمالي');
+            $schema[] = TextEntry::make('line_cost_total')->numeric(3);
+        }
 
         return [$tableColumns, $schema];
     }

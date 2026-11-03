@@ -182,7 +182,7 @@ class InstallmentContractsTable
                     ->icon('heroicon-m-pencil')
                     ->color('info')
                     ->iconSize(IconSize::Small)
-                    ->visible(fn (): bool => Auth::user()?->can('تعديل عقود') || Auth::user()?->is_prog)
+                    ->visible(fn (): bool => \App\Support\Authz::can('تعديل عقود'))
                     ->url(fn (InstallmentContract $record): string => CompanySettings::linkSalesToInstallments()
                         ? EditInstallmentContract::getUrl(['record' => $record->getKey()])
                         : InstallmentContractResource::getUrl('edit', ['record' => $record])),
@@ -201,9 +201,7 @@ class InstallmentContractsTable
     {
         $user = Auth::user();
 
-        return $user?->is_prog
-            || $user?->can('تعديل عقود')
-            || $user?->can('ادخال عقود');
+        return \App\Support\Authz::can('تعديل عقود', 'ادخال عقود');
     }
 
     protected static function tableFilterValue(mixed $livewire, string $name): mixed

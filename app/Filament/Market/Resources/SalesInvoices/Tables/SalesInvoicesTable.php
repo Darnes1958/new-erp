@@ -8,6 +8,7 @@ use App\Filament\Market\Support\SalesInvoiceDispatchPrintAction;
 use App\Filament\Market\Support\SalesInvoiceViewModalAction;
 use App\Models\SalesInvoice;
 use App\Services\Inventory\SalesInvoiceCancelService;
+use App\Support\Authz;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\DatePicker;
@@ -101,6 +102,7 @@ class SalesInvoicesTable
                     ->icon('heroicon-m-pencil')
                     ->iconButton()
                     ->color('info')
+                    ->visible(fn (): bool => Authz::can('تعديل مبيعات'))
                     ->url(fn ($record): string => EditSell::getUrl(['record' => $record])),
                 Action::make('sales_return')
                     ->label('ترجيع')
@@ -108,10 +110,11 @@ class SalesInvoicesTable
                     ->iconButton()
                     ->color('primary')
                     ->tooltip('ترجيع')
+                    ->visible(fn (): bool => Authz::can('ادخال ترجيع مبيعات', 'الغاء ترجيع مبيعات'))
                     ->url(fn ($record): string => SalesReturnEntry::getUrl(['record' => $record])),
                 DeleteAction::make()
                     ->iconButton()
-                    ->visible(fn (SalesInvoice $record): bool => $record->canBeDeleted())
+                    ->visible(fn (SalesInvoice $record): bool => Authz::can('الغاء مبيعات') && $record->canBeDeleted())
                     ->modalHeading('إلغاء فاتورة المبيعات')
                     ->modalDescription(fn (SalesInvoice $record): string => $record->canCancelLinkedReceiptsWithInvoice() && $record->hasLinkedReceipts()
                         ? 'هذه فاتورة مبيعات عامة مسددة. سيتم إلغاء إيصال القبض المرتبط بها مع الفاتورة في نفس العملية.'

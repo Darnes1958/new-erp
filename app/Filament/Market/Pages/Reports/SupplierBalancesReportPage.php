@@ -61,7 +61,7 @@ class SupplierBalancesReportPage extends Page implements HasActions, HasForms, H
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('تقارير موردين');
+        return \App\Support\Authz::can('تقارير موردين', 'تقارير الموردين', 'تقرير الموردين');
     }
 
     public static function canAccess(): bool

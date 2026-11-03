@@ -8,6 +8,7 @@ use App\Filament\Market\Resources\Warehouses\Pages\ListWarehouses;
 use App\Filament\Market\Resources\Warehouses\Schemas\WarehouseForm;
 use App\Filament\Market\Resources\Warehouses\Tables\WarehousesTable;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Support\AuthorizesErpResource;
 use App\Models\Warehouse;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -15,6 +16,8 @@ use Filament\Tables\Table;
 
 class WarehouseResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = Warehouse::class;
 
     protected static ?string $navigationLabel = 'مخازن';
@@ -28,6 +31,21 @@ class WarehouseResource extends Resource
     protected static string|\UnitEnum|null $navigationGroup = MarketNavigationGroup::WarehousesItems;
 
     protected static ?int $navigationSort = 2;
+
+    protected static function createPermissions(): array
+    {
+        return ['ادخال مخازن'];
+    }
+
+    protected static function editPermissions(): array
+    {
+        return ['تعديل مخازن', 'ادخال مخازن'];
+    }
+
+    protected static function deletePermissions(): array
+    {
+        return ['الغاء مخازن'];
+    }
 
     public static function form(Schema $schema): Schema
     {

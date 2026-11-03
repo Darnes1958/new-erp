@@ -18,7 +18,7 @@ class InstallmentContractCancelAfterActions
 
     public static function canRun(): bool
     {
-        return Auth::user()?->can('الغاء عقود') || Auth::user()?->is_prog;
+        return \App\Support\Authz::can('الغاء عقود');
     }
 
     public static function warningAction(bool $iconButton = false, bool | Closure $visible = true): Action

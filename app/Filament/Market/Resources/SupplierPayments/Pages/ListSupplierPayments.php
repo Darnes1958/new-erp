@@ -25,7 +25,7 @@ class ListSupplierPayments extends ListRecords
     {
         return [
             CreateAction::make()
-                ->visible(fn (): bool => Auth::user()?->can('ادخال ايصالات موردين') || Auth::user()?->is_prog),
+                ->visible(fn (): bool => \App\Support\Authz::can('ادخال ايصالات موردين')),
             InstallmentListPrintActions::compactPrint('print', fn () => $this->downloadReceiptListPdf()),
             InstallmentListPrintActions::compactExcel('exportExcel', fn () => $this->downloadReceiptListExcel()),
         ];

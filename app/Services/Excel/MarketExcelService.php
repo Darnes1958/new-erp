@@ -146,6 +146,7 @@ class MarketExcelService
         string $itemName,
         string $dateFrom,
         ?string $warehouseName,
+        bool $showBuyPrices = true,
     ): BinaryFileResponse {
         return \Maatwebsite\Excel\Facades\Excel::download(
             new ItemMovementExport(
@@ -154,6 +155,7 @@ class MarketExcelService
                 itemName: $itemName,
                 dateFrom: $dateFrom,
                 warehouseName: $warehouseName,
+                showBuyPrices: $showBuyPrices,
             ),
             'item-movement.xlsx',
         );

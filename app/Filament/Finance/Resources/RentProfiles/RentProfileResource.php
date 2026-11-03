@@ -39,7 +39,7 @@ class RentProfileResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('إيجارات');
+        return \App\Support\Authz::can('إيجارات');
     }
 
     public static function form(Schema $schema): Schema

@@ -62,7 +62,7 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('تقارير مخزون');
+        return \App\Support\Authz::can('تقارير مخزون', 'المخزون');
     }
 
     public static function canAccess(): bool
@@ -116,7 +116,8 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
                                 $this->resetTable();
                             }),
                         Actions::make([
-                            InstallmentListPrintActions::compactPrint('printWithCosts', fn () => $this->downloadPdf(showCosts: true)),
+                            InstallmentListPrintActions::compactPrint('printWithCosts', fn () => $this->downloadPdf(showCosts: true))
+                                ->visible($this->canViewBuyPrices()),
                             \Filament\Actions\Action::make('printWithoutCosts')
                                 ->label('طباعة بدون سعر')
                                 ->icon('heroicon-o-printer')
@@ -281,8 +282,6 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
 
     protected function canViewBuyPrices(): bool
     {
-        $user = Auth::user();
-
-        return $user?->is_prog || $user?->can('ادخال مشتريات');
+        return \App\Support\Authz::canViewBuyPrice();
     }
 }

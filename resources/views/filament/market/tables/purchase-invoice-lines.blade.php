@@ -4,6 +4,7 @@
     $lines = $invoice->lines;
     $dualUnit = \App\Support\CompanySettings::hasDualUnit();
     $formatWhole = static fn (mixed $value): string => number_format(round((float) $value), 0, '.', ',');
+    $showBuyPrices = \App\Support\Authz::canViewBuyPrice();
 @endphp
 
 @if ($lines->isEmpty())
@@ -18,8 +19,10 @@
                 @if ($dualUnit)
                     <col class="col-qty">
                 @endif
-                <col class="col-money">
-                <col class="col-money">
+                @if ($showBuyPrices)
+                    <col class="col-money">
+                    <col class="col-money">
+                @endif
             </colgroup>
             <thead>
                 <tr class="bg-gray-100 dark:bg-gray-800">
@@ -29,8 +32,10 @@
                     @if ($dualUnit)
                         <th class="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">كمية 2</th>
                     @endif
-                    <th class="border border-gray-200 px-3 py-2 text-end dark:border-gray-700">السعر</th>
-                    <th class="border border-gray-200 px-3 py-2 text-end dark:border-gray-700">الإجمالي</th>
+                    @if ($showBuyPrices)
+                        <th class="border border-gray-200 px-3 py-2 text-end dark:border-gray-700">السعر</th>
+                        <th class="border border-gray-200 px-3 py-2 text-end dark:border-gray-700">الإجمالي</th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
@@ -46,12 +51,14 @@
                                 <span dir="ltr" class="purchase-inv-num purchase-inv-num--center">{{ $formatWhole($line->qty_secondary) }}</span>
                             </td>
                         @endif
-                        <td class="border border-gray-200 px-3 py-2 text-end dark:border-gray-700">
-                            <span dir="ltr" class="purchase-inv-num">{{ $formatWhole($line->unit_cost_primary) }}</span>
-                        </td>
-                        <td class="border border-gray-200 px-3 py-2 text-end dark:border-gray-700">
-                            <span dir="ltr" class="purchase-inv-num">{{ $formatWhole($line->line_cost_total) }}</span>
-                        </td>
+                        @if ($showBuyPrices)
+                            <td class="border border-gray-200 px-3 py-2 text-end dark:border-gray-700">
+                                <span dir="ltr" class="purchase-inv-num">{{ $formatWhole($line->unit_cost_primary) }}</span>
+                            </td>
+                            <td class="border border-gray-200 px-3 py-2 text-end dark:border-gray-700">
+                                <span dir="ltr" class="purchase-inv-num">{{ $formatWhole($line->line_cost_total) }}</span>
+                            </td>
+                        @endif
                     </tr>
                 @endforeach
             </tbody>

@@ -37,7 +37,7 @@ class InstallmentContractArchiveResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('تقرير عن عقد من الارشيف');
+        return \App\Support\Authz::can('تقرير عن عقد من الارشيف');
     }
 
     public static function canAccess(): bool

@@ -3,6 +3,7 @@
 namespace App\Filament\Market\Resources\InventoryCountLines\Tables;
 
 use App\Models\InventoryCountLine;
+use App\Support\Authz;
 use App\Services\Inventory\InventoryCountService;
 use App\Services\Inventory\SalesInventoryService;
 use Filament\Actions\DeleteAction;
@@ -47,7 +48,8 @@ class InventoryCountLinesTable
                     ->numeric(3),
                 TextColumn::make('value_amount')
                     ->label('القيمة')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->visible(Authz::canViewBuyPrice()),
                 TextColumn::make('created_at')
                     ->label('التاريخ')
                     ->dateTime('Y-m-d H:i'),

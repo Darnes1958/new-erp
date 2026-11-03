@@ -55,7 +55,7 @@ class BranchTotalsReportPage extends Page implements HasActions, HasForms, HasTa
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('اجمالي المصارف');
+        return \App\Support\Authz::can('اجمالي المصارف');
     }
 
     public static function canAccess(): bool

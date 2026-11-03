@@ -107,17 +107,9 @@ class SupplierPaymentsTable
                         app(PaymentReceiptVoucherPdfService::class)->supplierPayment($record),
                     )),
                 EditAction::make()
-                    ->visible(fn (SupplierPayment $record): bool => (
-                        (int) $record->transaction_kind->value < ReceiptTransactionKind::WithInvoicePayment->value
-                        || Auth::user()?->can('الغاء ايصالات موردين')
-                        || Auth::user()?->is_prog
-                    )),
+                    ->visible(fn (): bool => \App\Support\Authz::can('ادخال ايصالات موردين', 'ايصالات موردين')),
                 DeleteAction::make()
-                    ->visible(fn (SupplierPayment $record): bool => (
-                        (int) $record->transaction_kind->value < ReceiptTransactionKind::WithInvoicePayment->value
-                        || Auth::user()?->can('الغاء ايصالات موردين')
-                        || Auth::user()?->is_prog
-                    ))
+                    ->visible(fn (): bool => \App\Support\Authz::can('الغاء ايصالات موردين'))
                     ->after(function (SupplierPayment $record): void {
                         app(SupplierPaymentService::class)->afterDeleted($record);
                     }),

@@ -14,7 +14,7 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
+use App\Support\Authz;
 
 class SalesOfferInvoicesTable
 {
@@ -105,10 +105,11 @@ class SalesOfferInvoicesTable
                     ->icon('heroicon-m-pencil')
                     ->iconButton()
                     ->color('info')
+                    ->visible(fn (): bool => Authz::can('تعديل مبيعات'))
                     ->url(fn (Model $record): string => EditSellOffer::getUrl(['record' => $record])),
                 DeleteAction::make()
                     ->iconButton()
-                    ->visible(fn (): bool => Auth::user()?->can('الغاء مبيعات') || Auth::user()?->is_prog),
+                    ->visible(fn (): bool => Authz::can('الغاء مبيعات')),
             ]);
     }
 }

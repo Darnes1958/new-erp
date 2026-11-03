@@ -88,7 +88,7 @@ class ContractReportPage extends Page implements HasActions, HasSchemas, HasTabl
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('تقرير عن عقد');
+        return \App\Support\Authz::can('تقرير عن عقد', 'استفسار عقود فقط');
     }
 
     public static function canAccess(): bool

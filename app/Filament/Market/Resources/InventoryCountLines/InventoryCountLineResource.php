@@ -35,9 +35,7 @@ class InventoryCountLineResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        $user = Auth::user();
-
-        if (! ($user?->is_prog || $user?->hasRole('admin'))) {
+        if (! \App\Support\Authz::can('المخزون')) {
             return false;
         }
 

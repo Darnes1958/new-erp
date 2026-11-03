@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Filament\Admin\Resources\Roles\Pages;
+
+use App\Filament\Admin\Resources\Roles\RoleResource;
+use App\Models\Role;
+use Filament\Actions\DeleteAction;
+use Filament\Resources\Pages\EditRecord;
+
+class EditRole extends EditRecord
+{
+    protected static string $resource = RoleResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            DeleteAction::make()
+                ->hidden(fn (): bool => $this->record instanceof Role && $this->record->name === 'admin'),
+        ];
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return static::getResource()::getUrl('index');
+    }
+}

@@ -12,6 +12,7 @@ use App\Filament\Market\Resources\SalesInvoices\Schemas\SalesInvoiceForm;
 use App\Filament\Market\Resources\SalesInvoices\Schemas\SalesInvoiceInfolist;
 use App\Filament\Market\Resources\SalesInvoices\Tables\SalesInvoicesTable;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Support\AuthorizesErpResource;
 use App\Models\SalesInvoice;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -19,6 +20,8 @@ use Filament\Tables\Table;
 
 class SalesInvoiceResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = SalesInvoice::class;
 
     protected static ?string $navigationLabel = 'فواتير البيع';
@@ -32,6 +35,33 @@ class SalesInvoiceResource extends Resource
     protected static string|\UnitEnum|null $navigationGroup = MarketNavigationGroup::SalesInvoices;
 
     protected static ?int $navigationSort = 1;
+
+    protected static function createPermissions(): array
+    {
+        return ['ادخال مبيعات'];
+    }
+
+    protected static function editPermissions(): array
+    {
+        return ['تعديل مبيعات'];
+    }
+
+    protected static function deletePermissions(): array
+    {
+        return ['الغاء مبيعات'];
+    }
+
+    protected static function accessPermissions(): array
+    {
+        return [
+            'ادخال مبيعات',
+            'تعديل مبيعات',
+            'الغاء مبيعات',
+            'ادخال ترجيع مبيعات',
+            'الغاء ترجيع مبيعات',
+            'تقارير مبيعات',
+        ];
+    }
 
     public static function form(Schema $schema): Schema
     {

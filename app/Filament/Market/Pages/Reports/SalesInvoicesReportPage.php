@@ -68,7 +68,7 @@ class SalesInvoicesReportPage extends Page implements HasActions, HasForms, HasT
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('ادخال مبيعات') || $user?->can('تقارير مبيعات');
+        return \App\Support\Authz::can('تقارير مبيعات', 'ادخال مبيعات');
     }
 
     public static function canAccess(): bool

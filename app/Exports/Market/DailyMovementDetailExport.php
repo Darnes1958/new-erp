@@ -7,6 +7,7 @@ use App\Enums\RentTransactionType;
 use App\Enums\SalaryTransactionType;
 use App\Models\OurCompany;
 use App\Services\Market\DailyMovementReportService;
+use App\Support\Authz;
 use App\Support\Utf8Text;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -160,20 +161,32 @@ class DailyMovementDetailExport implements FromCollection, WithEvents, WithHeadi
                     [4, 5],
                 );
 
+                $showBuyPrices = Authz::canViewBuyPrice();
                 $row = $this->writeDailyMovementSection(
                     $sheet,
                     $row,
                     'ترجيع مشتريات',
-                    ['التاريخ', 'المورد', 'الصنف', 'الكمية', 'الإجمالي'],
-                    $this->purchaseReturns->map(fn ($return): array => [
-                        $return->return_date?->format('Y-m-d'),
-                        Utf8Text::clean($return->purchaseInvoice?->supplier?->name),
-                        Utf8Text::clean($return->item?->name),
-                        (float) $return->qty_primary,
-                        (float) $return->line_total,
-                    ])->all(),
-                    ['A' => 14, 'B' => 24, 'C' => 24, 'D' => 12, 'E' => 14],
-                    [4, 5],
+                    $showBuyPrices
+                        ? ['التاريخ', 'المورد', 'الصنف', 'الكمية', 'الإجمالي']
+                        : ['التاريخ', 'المورد', 'الصنف', 'الكمية'],
+                    $this->purchaseReturns->map(function ($return) use ($showBuyPrices): array {
+                        $row = [
+                            $return->return_date?->format('Y-m-d'),
+                            Utf8Text::clean($return->purchaseInvoice?->supplier?->name),
+                            Utf8Text::clean($return->item?->name),
+                            (float) $return->qty_primary,
+                        ];
+
+                        if ($showBuyPrices) {
+                            $row[] = (float) $return->line_total;
+                        }
+
+                        return $row;
+                    })->all(),
+                    $showBuyPrices
+                        ? ['A' => 14, 'B' => 24, 'C' => 24, 'D' => 12, 'E' => 14]
+                        : ['A' => 14, 'B' => 24, 'C' => 24, 'D' => 12],
+                    $showBuyPrices ? [4, 5] : [4],
                 );
 
                 $row = $this->writeDailyMovementSection(

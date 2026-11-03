@@ -12,6 +12,7 @@ use App\Filament\Market\Resources\PurchaseInvoices\Schemas\PurchaseInvoiceForm;
 use App\Filament\Market\Resources\PurchaseInvoices\Schemas\PurchaseInvoiceInfolist;
 use App\Filament\Market\Resources\PurchaseInvoices\Tables\PurchaseInvoicesTable;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Support\AuthorizesErpResource;
 use App\Models\PurchaseInvoice;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -19,6 +20,8 @@ use Filament\Tables\Table;
 
 class PurchaseInvoiceResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = PurchaseInvoice::class;
 
     protected static ?string $navigationLabel = 'فواتير الشراء';
@@ -32,6 +35,34 @@ class PurchaseInvoiceResource extends Resource
     protected static string|\UnitEnum|null $navigationGroup = MarketNavigationGroup::PurchaseInvoices;
 
     protected static ?int $navigationSort = 2;
+
+    protected static function createPermissions(): array
+    {
+        return ['ادخال مشتريات'];
+    }
+
+    protected static function editPermissions(): array
+    {
+        return ['تعديل مشتريات', 'ادخال مشتريات'];
+    }
+
+    protected static function deletePermissions(): array
+    {
+        return ['الغاء مشتريات'];
+    }
+
+    protected static function accessPermissions(): array
+    {
+        return [
+            'ادخال مشتريات',
+            'تعديل مشتريات',
+            'الغاء مشتريات',
+            'ادخال ترجيع مشتريات',
+            'الغاء ترجيع مشتريات',
+            'ترجيع مشتريات',
+            'تقارير مشتريات',
+        ];
+    }
 
     public static function form(Schema $schema): Schema
     {

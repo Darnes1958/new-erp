@@ -57,11 +57,7 @@ class EditInstallmentContract extends Page implements HasSchemas
             return false;
         }
 
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return $user->can('تعديل عقود') && CompanySettings::linkSalesToInstallments();
+        return \App\Support\Authz::can('تعديل عقود') && CompanySettings::linkSalesToInstallments();
     }
 
     public static function shouldRegisterNavigation(array $parameters = []): bool

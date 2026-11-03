@@ -29,11 +29,7 @@ class InstallmentReportsHub extends Page
     {
         $user = Auth::user();
 
-        return $user?->is_prog
-            || $user?->can('ادخال عقود')
-            || $user?->can('تعديل عقود')
-            || $user?->can('تقرير عن عقد')
-            || $user?->can('تقرير عن مصرف');
+        return \App\Support\Authz::can('تقرير عن عقد', 'تقرير عن مصرف', 'ادخال عقود', 'تعديل عقود', 'اجمالي المصارف');
     }
 
     /**

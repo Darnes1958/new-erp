@@ -80,7 +80,7 @@ class DailyMovementReportPage extends Page implements HasActions, HasForms
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('تقارير');
+        return \App\Support\Authz::can('اليومية', 'التقرير المالي');
     }
 
     public static function canAccess(): bool

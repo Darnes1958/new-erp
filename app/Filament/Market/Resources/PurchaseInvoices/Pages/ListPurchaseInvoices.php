@@ -4,6 +4,7 @@ namespace App\Filament\Market\Resources\PurchaseInvoices\Pages;
 
 use App\Filament\Market\Pages\InpBuy\InpBuy;
 use App\Filament\Market\Resources\PurchaseInvoices\PurchaseInvoiceResource;
+use App\Support\Authz;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,7 @@ class ListPurchaseInvoices extends ListRecords
             Action::make('inpBuy')
                 ->label('فاتورة مشتريات جديدة')
                 ->icon('heroicon-o-plus-circle')
+                ->visible(fn (): bool => Authz::can('ادخال مشتريات'))
                 ->url(fn (): string => InpBuy::getUrl()),
         ];
     }

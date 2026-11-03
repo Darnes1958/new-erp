@@ -7,6 +7,7 @@ use App\Models\PurchaseInvoice;
 use App\Models\PurchaseInvoiceLine;
 use App\Models\PurchaseReturn;
 use App\Services\Inventory\PurchaseReturnService;
+use App\Support\Authz;
 use App\Support\CompanySettings;
 use App\Support\ErpNumber;
 use App\Support\ProgrammingError;
@@ -55,17 +56,7 @@ class PurchaseReturnEntry extends Page implements HasSchemas, HasTable
 
     public static function canAccess(array $parameters = []): bool
     {
-        $user = Auth::user();
-
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return $user->can('ادخال مشتريات');
+        return \App\Support\Authz::can('ادخال ترجيع مشتريات', 'الغاء ترجيع مشتريات', 'ترجيع مشتريات');
     }
 
     public static function shouldRegisterNavigation(array $parameters = []): bool
@@ -274,10 +265,12 @@ class PurchaseReturnEntry extends Page implements HasSchemas, HasTable
                     ->formatStateUsing(fn ($state) => (float) $state == 0.0 ? '' : ErpNumber::quantity($state)),
                 TextColumn::make('unit_cost_primary')
                     ->label('سعر الشراء')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->visible(Authz::canViewBuyPrice()),
                 TextColumn::make('line_cost_total')
                     ->label('المجموع')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->visible(Authz::canViewBuyPrice()),
             ])
             ->recordActions([
                 Action::make('cancel_return')

@@ -287,17 +287,21 @@
         <thead>
         <tr>
             <th>التاريخ</th>
-            <th>الإجمالي</th>
+            @if ($showBuyPrices ?? false)
+                <th>الإجمالي</th>
+            @endif
         </tr>
         </thead>
         <tbody>
         @forelse ($purchaseReturns as $row)
             <tr>
                 <td>{{ optional($row->return_date)->format('Y-m-d') }}</td>
-                <td>{{ number_format((float) $row->total_amount, 3, '.', ',') }}</td>
+                @if ($showBuyPrices ?? false)
+                    <td>{{ number_format((float) $row->total_amount, 3, '.', ',') }}</td>
+                @endif
             </tr>
         @empty
-            <tr><td colspan="2" style="text-align: center;">لا توجد بيانات</td></tr>
+            <tr><td colspan="{{ ($showBuyPrices ?? false) ? 2 : 1 }}" style="text-align: center;">لا توجد بيانات</td></tr>
         @endforelse
         </tbody>
     </table>

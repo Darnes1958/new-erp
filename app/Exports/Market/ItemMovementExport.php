@@ -4,6 +4,7 @@ namespace App\Exports\Market;
 
 use App\Exports\Installments\Concerns\RtlInstallmentSheet;
 use App\Models\OurCompany;
+use App\Support\Authz;
 use App\Support\Utf8Text;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -32,6 +33,7 @@ class ItemMovementExport implements FromCollection, WithHeadings, WithMapping, W
         protected string $itemName,
         protected string $dateFrom,
         protected ?string $warehouseName,
+        protected bool $showBuyPrices = true,
     ) {}
 
     public function collection(): Collection
@@ -51,8 +53,8 @@ class ItemMovementExport implements FromCollection, WithHeadings, WithMapping, W
             Utf8Text::clean($row->place_name),
             Utf8Text::clean($row->notes),
             (float) $row->q1,
-            (float) $row->price1,
-            (float) $row->sub_tot,
+            $this->movementPrice($row),
+            $this->movementTotal($row),
         ];
     }
 
@@ -132,8 +134,8 @@ class ItemMovementExport implements FromCollection, WithHeadings, WithMapping, W
                     $sheet->setCellValue('G'.$rowIndex, Utf8Text::clean($row->place_name));
                     $sheet->setCellValue('H'.$rowIndex, Utf8Text::clean($row->notes));
                     $sheet->setCellValue('I'.$rowIndex, (float) $row->q1);
-                    $sheet->setCellValue('J'.$rowIndex, (float) $row->price1);
-                    $sheet->setCellValue('K'.$rowIndex, (float) $row->sub_tot);
+                    $sheet->setCellValue('J'.$rowIndex, $this->movementPrice($row));
+                    $sheet->setCellValue('K'.$rowIndex, $this->movementTotal($row));
                     $rowIndex++;
                 }
 
@@ -153,5 +155,20 @@ class ItemMovementExport implements FromCollection, WithHeadings, WithMapping, W
                     ->setFormatCode(NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1);
             },
         ];
+    }
+
+    protected function hidesPurchaseCost(object $row): bool
+    {
+        return ! $this->showBuyPrices && Authz::isPurchaseCostMovementType($row->type ?? null);
+    }
+
+    protected function movementPrice(object $row): ?float
+    {
+        return $this->hidesPurchaseCost($row) ? null : (float) $row->price1;
+    }
+
+    protected function movementTotal(object $row): ?float
+    {
+        return $this->hidesPurchaseCost($row) ? null : (float) $row->sub_tot;
     }
 }

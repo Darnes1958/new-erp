@@ -80,10 +80,7 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
     {
         $user = Auth::user();
 
-        return $user?->is_prog
-            || $user?->can('تقرير ايقاف الخصm')
-            || $user?->can('ادخال عقود')
-            || $user?->can('تعديل عقود');
+        return \App\Support\Authz::can('ايقاف الخصم', 'تقرير ايقاف الخصم', 'ادخال عقود', 'تعديل عقود');
     }
 
     public static function reportTabUrl(): string

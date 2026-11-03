@@ -75,7 +75,7 @@ class BankReportsPage extends Page implements HasActions, HasForms, HasTable
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('تقرير عن مصرف');
+        return \App\Support\Authz::can('تقرير عن مصرف', 'اجمالي المصارف');
     }
 
     public static function canAccess(): bool

@@ -62,9 +62,7 @@ class ExpenseMovementReportPage extends Page implements HasActions, HasForms, Ha
     {
         $user = Auth::user();
 
-        return $user?->is_prog
-            || $user?->can('ادخال مصروفات')
-            || $user?->can('تقارير مصروفات');
+        return \App\Support\Authz::can('تقارير مصروفات', 'ادخال مصروفات');
     }
 
     public static function canAccess(): bool

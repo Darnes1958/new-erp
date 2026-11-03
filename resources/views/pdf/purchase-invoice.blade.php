@@ -67,8 +67,10 @@
             @if ($hasDualUnit)
                 <th width="8%">الكمية 2</th>
             @endif
-            <th width="12%">السعر</th>
-            <th width="12%">المجموع</th>
+            @if ($showBuyPrices ?? false)
+                <th width="12%">السعر</th>
+                <th width="12%">المجموع</th>
+            @endif
         </tr>
         </thead>
         <tbody>
@@ -80,13 +82,15 @@
                 @if ($hasDualUnit)
                     <td style="text-align: center;">{{ number_format((float) $line->qty_secondary, 0) }}</td>
                 @endif
-                <td style="text-align: right;">{{ number_format((float) $line->unit_cost_primary, 3) }}</td>
-                <td style="text-align: right;">{{ number_format((float) $line->line_cost_total, 3) }}</td>
+                @if ($showBuyPrices ?? false)
+                    <td style="text-align: right;">{{ number_format((float) $line->unit_cost_primary, 3) }}</td>
+                    <td style="text-align: right;">{{ number_format((float) $line->line_cost_total, 3) }}</td>
+                @endif
             </tr>
         @endforeach
         </tbody>
         <tbody>
-        @php($summaryColspan = $hasDualUnit ? 4 : 3)
+        @php($summaryColspan = ($hasDualUnit ? 4 : 3) - (($showBuyPrices ?? false) ? 0 : 1))
         <tr style="border: none">
             <td style="border: none" colspan="{{ $summaryColspan }}"></td>
             <td>إجمالي الفاتورة</td>

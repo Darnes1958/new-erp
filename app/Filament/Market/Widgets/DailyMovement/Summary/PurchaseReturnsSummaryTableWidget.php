@@ -3,6 +3,7 @@
 namespace App\Filament\Market\Widgets\DailyMovement\Summary;
 
 use App\Filament\Market\Widgets\DailyMovement\BaseDailyMovementTableWidget;
+use App\Support\Authz;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -21,7 +22,8 @@ class PurchaseReturnsSummaryTableWidget extends BaseDailyMovementTableWidget
                     ->date('Y-m-d'),
                 TextColumn::make('total_amount')
                     ->label('الإجمالي')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->visible(Authz::canViewBuyPrice()),
             ]);
     }
 }

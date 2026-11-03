@@ -213,7 +213,9 @@
             <th>المورد</th>
             <th>الصنف</th>
             <th>الكمية</th>
-            <th>الإجمالي</th>
+            @if ($showBuyPrices ?? false)
+                <th>الإجمالي</th>
+            @endif
         </tr>
         </thead>
         <tbody>
@@ -223,10 +225,12 @@
                 <td>{{ $row->purchaseInvoice?->supplier?->name }}</td>
                 <td>{{ $row->item?->name }}</td>
                 <td>{{ number_format((float) $row->qty_primary, 3, '.', ',') }}</td>
-                <td>{{ number_format((float) $row->line_total, 3, '.', ',') }}</td>
+                @if ($showBuyPrices ?? false)
+                    <td>{{ number_format((float) $row->line_total, 3, '.', ',') }}</td>
+                @endif
             </tr>
         @empty
-            <tr><td colspan="5" style="text-align: center;">لا توجد بيانات</td></tr>
+            <tr><td colspan="{{ ($showBuyPrices ?? false) ? 5 : 4 }}" style="text-align: center;">لا توجد بيانات</td></tr>
         @endforelse
         </tbody>
     </table>

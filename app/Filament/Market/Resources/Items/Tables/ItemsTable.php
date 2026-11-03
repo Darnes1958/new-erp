@@ -3,6 +3,7 @@
 namespace App\Filament\Market\Resources\Items\Tables;
 
 use App\Models\Item;
+use App\Support\Authz;
 use App\Services\Pdf\ItemLabelPdfService;
 use App\Support\PdfDownload;
 use Filament\Actions\Action;
@@ -43,7 +44,8 @@ class ItemsTable
                     ->boolean(),
                 TextColumn::make('default_buy_price')
                     ->label('سعر الشراء')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->visible(Authz::canViewBuyPrice()),
                 IconColumn::make('is_active')
                     ->label('نشط')
                     ->boolean(),

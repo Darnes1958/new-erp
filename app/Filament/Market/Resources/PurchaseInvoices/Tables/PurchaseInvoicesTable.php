@@ -7,6 +7,7 @@ use App\Filament\Market\Resources\PurchaseInvoices\Pages\PurchaseReturnEntry;
 use App\Filament\Market\Resources\PurchaseInvoices\PurchaseInvoiceResource;
 use App\Models\PurchaseInvoice;
 use App\Services\Inventory\PurchaseInvoiceCancelService;
+use App\Support\Authz;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -132,6 +133,7 @@ class PurchaseInvoicesTable
                     ->icon('heroicon-m-pencil')
                     ->iconButton()
                     ->color('info')
+                    ->visible(fn (): bool => Authz::can('تعديل مشتريات', 'ادخال مشتريات'))
                     ->url(fn (Model $record): string => EditBuy::getUrl(['record' => $record])),
                 Action::make('purchase_return')
                     ->label('ترجيع')
@@ -139,10 +141,11 @@ class PurchaseInvoicesTable
                     ->iconButton()
                     ->color('primary')
                     ->tooltip('ترجيع')
+                    ->visible(fn (): bool => Authz::can('ادخال ترجيع مشتريات', 'الغاء ترجيع مشتريات', 'ترجيع مشتريات'))
                     ->url(fn (Model $record): string => PurchaseReturnEntry::getUrl(['record' => $record])),
                 DeleteAction::make()
                     ->iconButton()
-                    ->visible(fn (PurchaseInvoice $record): bool => $record->canBeDeleted())
+                    ->visible(fn (PurchaseInvoice $record): bool => Authz::can('الغاء مشتريات') && $record->canBeDeleted())
                     ->before(function (PurchaseInvoice $record): void {
                         try {
                             $record->assertCanBeDeleted();

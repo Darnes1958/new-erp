@@ -9,6 +9,7 @@ use App\Models\SalesReturn;
 use App\Services\Inventory\SalesReturnService;
 use App\Support\CompanySettings;
 use App\Support\ErpNumber;
+use App\Support\Authz;
 use App\Support\ProgrammingError;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -55,17 +56,7 @@ class SalesReturnEntry extends Page implements HasSchemas, HasTable
 
     public static function canAccess(array $parameters = []): bool
     {
-        $user = Auth::user();
-
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return $user->can('تعديل مبيعات');
+        return \App\Support\Authz::can('ادخال ترجيع مبيعات', 'الغاء ترجيع مبيعات');
     }
 
     public static function shouldRegisterNavigation(array $parameters = []): bool
@@ -196,7 +187,7 @@ class SalesReturnEntry extends Page implements HasSchemas, HasTable
                             ->icon('heroicon-m-plus')
                             ->button()
                             ->color('success')
-                            ->visible(fn (Get $get): bool => filled($get('item_id')) && (float) ($get('qty_primary') ?? 0) > 0)
+                            ->visible(fn (Get $get): bool => Authz::can('ادخال ترجيع مبيعات') && filled($get('item_id')) && (float) ($get('qty_primary') ?? 0) > 0)
                             ->requiresConfirmation()
                             ->action(fn () => $this->storeReturn()),
                     ])->columnSpanFull(),
@@ -282,7 +273,7 @@ class SalesReturnEntry extends Page implements HasSchemas, HasTable
                     ->iconButton()
                     ->color('primary')
                     ->tooltip('إلغاء الترجيع')
-                    ->visible(fn (SalesInvoiceLine $record): bool => $record->sales_return_id !== null)
+                    ->visible(fn (SalesInvoiceLine $record): bool => Authz::can('الغاء ترجيع مبيعات') && $record->sales_return_id !== null)
                     ->requiresConfirmation()
                     ->modalHeading('إلغاء الترجيع')
                     ->modalDescription('هل أنت متأكد من إلغاء ترجيع هذا البند؟')

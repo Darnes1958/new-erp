@@ -66,7 +66,7 @@ class PurchaseInvoicesReportPage extends Page implements HasActions, HasForms, H
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('ادخال مشتريات') || $user?->can('تقارير مشتريات');
+        return \App\Support\Authz::can('تقارير مشتريات', 'ادخال مشتريات');
     }
 
     public static function canAccess(): bool

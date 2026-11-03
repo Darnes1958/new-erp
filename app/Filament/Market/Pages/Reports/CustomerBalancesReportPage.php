@@ -61,7 +61,7 @@ class CustomerBalancesReportPage extends Page implements HasActions, HasForms, H
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('تقارير زبائن');
+        return \App\Support\Authz::can('تقارير زبائن', 'تقرير الزبائن');
     }
 
     public static function canAccess(): bool

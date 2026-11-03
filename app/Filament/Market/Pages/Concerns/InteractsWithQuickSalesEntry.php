@@ -40,10 +40,6 @@ trait InteractsWithQuickSalesEntry
             return false;
         }
 
-        if ($user->is_prog) {
-            return true;
-        }
-
         return $user->can('تعديل السعر');
     }
 

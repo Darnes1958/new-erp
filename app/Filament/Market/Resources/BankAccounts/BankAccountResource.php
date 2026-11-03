@@ -20,11 +20,14 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use App\Filament\Support\AuthorizesErpResource;
+use App\Support\Authz;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class BankAccountResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = BankAccount::class;
 
     protected static ?string $navigationLabel = 'حسابات مصرفية';
@@ -39,16 +42,14 @@ class BankAccountResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-    public static function shouldRegisterNavigation(): bool
+    protected static function createPermissions(): array
     {
-        $user = Auth::user();
-
-        return $user?->is_prog || $user?->can('ادخال مصارف');
+        return ['ادخال مصارف', 'مصارف'];
     }
 
-    public static function canAccess(): bool
+    protected static function deletePermissions(): array
     {
-        return static::shouldRegisterNavigation();
+        return ['الغاء مصارف'];
     }
 
     public static function form(Schema $schema): Schema
@@ -100,7 +101,7 @@ class BankAccountResource extends Resource
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make()
-                    ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('الغاء مصارف'))
+                    ->visible(fn (): bool => Authz::can('الغاء مصارف'))
                     ->hidden(fn (BankAccount $record): bool => CustomerReceipt::query()->where('bank_account_id', $record->id)->exists()
                         || SupplierPayment::query()->where('bank_account_id', $record->id)->exists()
                         || Expense::query()->where('bank_account_id', $record->id)->exists()

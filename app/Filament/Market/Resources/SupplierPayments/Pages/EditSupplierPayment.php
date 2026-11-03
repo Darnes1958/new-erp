@@ -60,7 +60,7 @@ class EditSupplierPayment extends EditRecord
         return [
             $this->printReceiptVoucherHeaderAction(),
             DeleteAction::make()
-                ->visible(fn (): bool => Auth::user()?->can('الغاء ايصالات موردين') || Auth::user()?->is_prog)
+                ->visible(fn (): bool => \App\Support\Authz::can('الغاء ايصالات موردين'))
                 ->after(function (): void {
                     app(SupplierPaymentService::class)->afterDeleted($this->record);
                 }),

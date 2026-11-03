@@ -74,7 +74,7 @@ class FundTransfersTable
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make()
-                    ->visible(fn (): bool => Auth::user()?->is_prog || Auth::user()?->can('الغاء تحويل'))
+                    ->visible(fn (): bool => \App\Support\Authz::can('الغاء تحويل'))
                     ->after(function (FundTransfer $record): void {
                         SystemOperationLogger::cancelled(SystemOperationType::FUND_TRANSFER, $record->id);
                     }),

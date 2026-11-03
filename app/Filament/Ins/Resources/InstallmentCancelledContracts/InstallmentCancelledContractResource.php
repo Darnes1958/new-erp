@@ -27,6 +27,16 @@ class InstallmentCancelledContractResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    public static function canAccess(): bool
+    {
+        return \App\Support\Authz::can('الغاء عقود', 'تقرير عن عقد');
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([]);

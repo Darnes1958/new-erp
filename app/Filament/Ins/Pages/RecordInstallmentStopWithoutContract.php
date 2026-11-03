@@ -74,7 +74,7 @@ class RecordInstallmentStopWithoutContract extends Page implements HasActions, H
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('ادخال عقود') || $user?->can('تعديل عقود');
+        return \App\Support\Authz::can('ايقاف الخصم', 'ادخال عقود', 'تعديل عقود');
     }
 
     public static function reportTabUrl(): string

@@ -7,6 +7,7 @@ use App\Models\PurchaseInvoice;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceWork;
 use App\Models\SalesOfferInvoice;
+use App\Support\Authz;
 use App\Support\CompanySettings;
 use Spatie\LaravelPdf\Facades\Pdf;
 use Spatie\LaravelPdf\PdfBuilder;
@@ -21,6 +22,7 @@ class InvoicePdfService
             'invoice' => $invoice,
             'company' => OurCompany::forCurrentUser(),
             'hasDualUnit' => CompanySettings::hasDualUnit(),
+            'showBuyPrices' => Authz::canViewBuyPrice(),
             'repDate' => now()->toDateString(),
         ])
             ->name("purchase-invoice-{$invoice->id}.pdf")

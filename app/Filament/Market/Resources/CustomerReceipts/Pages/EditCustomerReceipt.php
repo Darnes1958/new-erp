@@ -60,9 +60,7 @@ class EditCustomerReceipt extends EditRecord
         return [
             $this->printReceiptVoucherHeaderAction(),
             DeleteAction::make()
-                ->visible(fn (): bool => Auth::user()?->can('الغاء ايصالات زبائن')
-                    || Auth::user()?->can('االغاء ايصالات زبائن')
-                    || Auth::user()?->is_prog)
+                ->visible(fn (): bool => \App\Support\Authz::can('الغاء ايصالات زبائن', 'االغاء ايصالات زبائن', 'الغاء ايصالات قبض'))
                 ->after(function (): void {
                     app(CustomerReceiptService::class)->afterDeleted($this->record);
                 }),

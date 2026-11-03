@@ -64,10 +64,7 @@ class CashBoxMovementReportPage extends Page implements HasActions, HasForms, Ha
     {
         $user = Auth::user();
 
-        return $user?->is_prog
-            || $user?->can('ادخال خزائن')
-            || $user?->can('ادخال مصارف')
-            || $user?->can('تقارير خزينة');
+        return \App\Support\Authz::can('تقارير خزينة', 'ادخال خزينة', 'ادخال خزائن');
     }
 
     public static function canAccess(): bool

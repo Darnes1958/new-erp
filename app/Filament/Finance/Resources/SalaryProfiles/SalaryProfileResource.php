@@ -41,7 +41,7 @@ class SalaryProfileResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('مرتبات');
+        return \App\Support\Authz::can('مرتبات', 'ادخال مرتبات', 'اعداد مرتبات');
     }
 
     public static function form(Schema $schema): Schema

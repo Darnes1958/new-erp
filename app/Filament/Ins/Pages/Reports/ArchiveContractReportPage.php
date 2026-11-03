@@ -85,7 +85,7 @@ class ArchiveContractReportPage extends Page implements HasActions, HasSchemas, 
     {
         $user = Auth::user();
 
-        if (! ($user?->is_prog || $user?->can('تقرير عن عقد من الارشيف'))) {
+        if (! \App\Support\Authz::can('تقرير عن عقد من الارشيف')) {
             return false;
         }
 
@@ -96,7 +96,7 @@ class ArchiveContractReportPage extends Page implements HasActions, HasSchemas, 
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('تقرير عن عقد من الارشيف');
+        return \App\Support\Authz::can('تقرير عن عقد من الارشيف');
     }
 
     public function mount(): void

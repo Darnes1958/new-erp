@@ -38,17 +38,7 @@ class ListSalesReturns extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        $user = Auth::user();
-
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return $user->can('تعديل مبيعات');
+        return \App\Support\Authz::can('ادخال ترجيع مبيعات', 'الغاء ترجيع مبيعات');
     }
 
     public function table(Table $table): Table
@@ -95,7 +85,7 @@ class ListSalesReturns extends Page implements HasTable
                     ->label('إلغاء الترجيع')
                     ->icon('heroicon-m-trash')
                     ->requiresConfirmation()
-                    ->visible(fn (SalesReturn $record): bool => $record->salesInvoice !== null)
+                    ->visible(fn (SalesReturn $record): bool => \App\Support\Authz::can('الغاء ترجيع مبيعات') && $record->salesInvoice !== null)
                     ->action(function (SalesReturn $record): void {
                         try {
                             DB::connection($record->getConnectionName())->transaction(function () use ($record): void {

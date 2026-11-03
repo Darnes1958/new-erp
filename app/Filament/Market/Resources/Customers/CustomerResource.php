@@ -8,6 +8,7 @@ use App\Filament\Market\Resources\Customers\Pages\ListCustomers;
 use App\Filament\Market\Resources\Customers\Schemas\CustomerForm;
 use App\Filament\Market\Resources\Customers\Tables\CustomersTable;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Support\AuthorizesErpResource;
 use App\Models\Customer;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -15,6 +16,8 @@ use Filament\Tables\Table;
 
 class CustomerResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = Customer::class;
 
     protected static ?string $navigationLabel = 'زبائن';
@@ -28,6 +31,21 @@ class CustomerResource extends Resource
     protected static string|\UnitEnum|null $navigationGroup = MarketNavigationGroup::CustomersSuppliers;
 
     protected static ?int $navigationSort = 1;
+
+    protected static function createPermissions(): array
+    {
+        return ['ادخال زبائن'];
+    }
+
+    protected static function deletePermissions(): array
+    {
+        return ['الغاء زبائن'];
+    }
+
+    protected static function accessPermissions(): array
+    {
+        return ['ادخال زبائن', 'الغاء زبائن', 'تقارير زبائن', 'تقرير الزبائن', 'العملاء'];
+    }
 
     public static function form(Schema $schema): Schema
     {

@@ -38,17 +38,7 @@ class EditBuy extends Page implements HasSchemas, HasTable
 
     public static function canAccess(array $parameters = []): bool
     {
-        $user = Auth::user();
-
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return $user->can('ادخال مشتريات');
+        return \App\Support\Authz::can('تعديل مشتريات', 'ادخال مشتريات');
     }
 
     public static function shouldRegisterNavigation(array $parameters = []): bool

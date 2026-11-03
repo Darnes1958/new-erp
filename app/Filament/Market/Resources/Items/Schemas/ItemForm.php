@@ -2,6 +2,7 @@
 
 namespace App\Filament\Market\Resources\Items\Schemas;
 
+use App\Support\Authz;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -79,7 +80,9 @@ class ItemForm
                 TextInput::make('default_buy_price')
                     ->label('سعر الشراء الافتراضي')
                     ->numeric()
-                    ->default(0),
+                    ->default(0)
+                    ->visible(Authz::canViewBuyPrice())
+                    ->dehydrated(Authz::canViewBuyPrice()),
                 Toggle::make('is_active')
                     ->label('نشط')
                     ->default(true),

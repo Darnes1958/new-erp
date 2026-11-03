@@ -8,14 +8,16 @@ use App\Filament\Market\Resources\SupplierPayments\Pages\ListSupplierPayments;
 use App\Filament\Market\Resources\SupplierPayments\Schemas\SupplierPaymentForm;
 use App\Filament\Market\Resources\SupplierPayments\Tables\SupplierPaymentsTable;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Support\AuthorizesErpResource;
 use App\Models\SupplierPayment;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class SupplierPaymentResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = SupplierPayment::class;
 
     protected static ?string $navigationLabel = 'إيصالات موردين';
@@ -30,17 +32,14 @@ class SupplierPaymentResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-    public static function shouldRegisterNavigation(): bool
+    protected static function createPermissions(): array
     {
-        $user = Auth::user();
-
-        return $user?->can('ادخال ايصالات موردين') || $user?->is_prog;
+        return ['ادخال ايصالات موردين', 'ايصالات موردين'];
     }
 
-    public static function canAccess(): bool
+    protected static function deletePermissions(): array
     {
-        return static::shouldRegisterNavigation()
-            || Auth::user()?->can('الغاء ايصالات موردين');
+        return ['الغاء ايصالات موردين'];
     }
 
     public static function form(Schema $schema): Schema

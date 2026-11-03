@@ -64,10 +64,7 @@ class BankAccountMovementReportPage extends Page implements HasActions, HasForms
     {
         $user = Auth::user();
 
-        return $user?->is_prog
-            || $user?->can('ادخال خزائن')
-            || $user?->can('ادخال مصارف')
-            || $user?->can('تقارير مصارف');
+        return \App\Support\Authz::can('تقارير مصارف', 'ادخال مصارف', 'مصارف');
     }
 
     public static function canAccess(): bool

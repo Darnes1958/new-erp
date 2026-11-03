@@ -5,6 +5,7 @@ namespace App\Exports\Market;
 use App\Exports\Market\Concerns\BuildsDailyMovementExcelSheet;
 use App\Models\OurCompany;
 use App\Services\Market\DailyMovementReportService;
+use App\Support\Authz;
 use App\Support\ErpNumber;
 use App\Support\Utf8Text;
 use Illuminate\Support\Collection;
@@ -222,17 +223,23 @@ class DailyMovementSummaryExport implements FromCollection, WithEvents, WithHead
                     [2],
                 );
 
+                $showBuyPrices = Authz::canViewBuyPrice();
                 $row = $this->writeDailyMovementSection(
                     $sheet,
                     $row,
                     'ترجيع مشتريات',
-                    ['التاريخ', 'الإجمالي'],
-                    $this->purchaseReturns->map(fn ($item): array => [
-                        optional($item->return_date)->format('Y-m-d'),
-                        (float) $item->total_amount,
-                    ])->all(),
-                    ['A' => 14, 'B' => 14],
-                    [2],
+                    $showBuyPrices ? ['التاريخ', 'الإجمالي'] : ['التاريخ'],
+                    $this->purchaseReturns->map(function ($item) use ($showBuyPrices): array {
+                        $row = [optional($item->return_date)->format('Y-m-d')];
+
+                        if ($showBuyPrices) {
+                            $row[] = (float) $item->total_amount;
+                        }
+
+                        return $row;
+                    })->all(),
+                    $showBuyPrices ? ['A' => 14, 'B' => 14] : ['A' => 14],
+                    $showBuyPrices ? [2] : [],
                 );
 
                 $this->writeDailyMovementSection(

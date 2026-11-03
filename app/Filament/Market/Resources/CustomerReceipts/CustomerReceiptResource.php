@@ -8,14 +8,16 @@ use App\Filament\Market\Resources\CustomerReceipts\Pages\ListCustomerReceipts;
 use App\Filament\Market\Resources\CustomerReceipts\Schemas\CustomerReceiptForm;
 use App\Filament\Market\Resources\CustomerReceipts\Tables\CustomerReceiptsTable;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Support\AuthorizesErpResource;
 use App\Models\CustomerReceipt;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class CustomerReceiptResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = CustomerReceipt::class;
 
     protected static ?string $navigationLabel = 'إيصالات زبائن';
@@ -30,19 +32,19 @@ class CustomerReceiptResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-    public static function shouldRegisterNavigation(): bool
+    protected static function createPermissions(): array
     {
-        $user = Auth::user();
-
-        return $user?->can('ادخال ايصالات زبائن') || $user?->is_prog;
+        return ['ادخال ايصالات زبائن', 'ادخال ايصالات قبض'];
     }
 
-    public static function canAccess(): bool
+    protected static function editPermissions(): array
     {
-        return static::shouldRegisterNavigation()
-            || Auth::user()?->can('تعديل ايصالات زبائن')
-            || Auth::user()?->can('الغاء ايصالات زبائن')
-            || Auth::user()?->can('االغاء ايصالات زبائن');
+        return ['تعديل ايصالات زبائن', 'تعديل ايصالات قبض'];
+    }
+
+    protected static function deletePermissions(): array
+    {
+        return ['الغاء ايصالات زبائن', 'االغاء ايصالات زبائن', 'الغاء ايصالات قبض'];
     }
 
     public static function form(Schema $schema): Schema

@@ -28,17 +28,7 @@ class InpSellOffer extends Page implements HasSchemas, HasTable
 
     public static function canAccess(): bool
     {
-        $user = Auth::user();
-
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return $user->can('ادخال مبيعات');
+        return \App\Support\Authz::can('ادخال مبيعات');
     }
 
     public static function shouldRegisterNavigation(): bool

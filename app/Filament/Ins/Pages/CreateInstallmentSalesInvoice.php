@@ -48,11 +48,7 @@ class CreateInstallmentSalesInvoice extends Page implements HasSchemas, HasTable
             return false;
         }
 
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return ($user->can('ادخال عقود') || $user->can('ادخال مبيعات'))
+        return \App\Support\Authz::can('ادخال عقود', 'ادخال مبيعات')
             && CompanySettings::linkSalesToInstallments();
     }
 

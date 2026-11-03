@@ -25,7 +25,7 @@ class ListCustomerReceipts extends ListRecords
     {
         return [
             CreateAction::make()
-                ->visible(fn (): bool => Auth::user()?->can('ادخال ايصالات زبائن') || Auth::user()?->is_prog),
+                ->visible(fn (): bool => \App\Support\Authz::can('ادخال ايصالات زبائن', 'ادخال ايصالات قبض')),
             InstallmentListPrintActions::compactPrint('print', fn () => $this->downloadReceiptListPdf()),
             InstallmentListPrintActions::compactExcel('exportExcel', fn () => $this->downloadReceiptListExcel()),
         ];

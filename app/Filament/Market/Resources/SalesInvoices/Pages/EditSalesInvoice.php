@@ -4,6 +4,7 @@ namespace App\Filament\Market\Resources\SalesInvoices\Pages;
 
 use App\Filament\Market\Resources\SalesInvoices\SalesInvoiceResource;
 use App\Services\Inventory\SalesInvoiceCancelService;
+use App\Support\Authz;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
@@ -18,7 +19,7 @@ class EditSalesInvoice extends EditRecord
         return [
             ViewAction::make(),
             DeleteAction::make()
-                ->visible(fn (): bool => $this->record->canBeDeleted())
+                ->visible(fn (): bool => Authz::can('الغاء مبيعات') && $this->record->canBeDeleted())
                 ->modalHeading('إلغاء فاتورة المبيعات')
                 ->modalDescription(fn (): string => $this->record->canCancelLinkedReceiptsWithInvoice() && $this->record->hasLinkedReceipts()
                     ? 'هذه فاتورة مبيعات عامة مسددة. سيتم إلغاء إيصال القبض المرتبط بها مع الفاتورة في نفس العملية.'

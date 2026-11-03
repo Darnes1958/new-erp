@@ -8,14 +8,16 @@ use App\Filament\Market\Resources\FundTransfers\Pages\ListFundTransfers;
 use App\Filament\Market\Resources\FundTransfers\Schemas\FundTransferForm;
 use App\Filament\Market\Resources\FundTransfers\Tables\FundTransfersTable;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Filament\Support\AuthorizesErpResource;
 use App\Models\FundTransfer;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class FundTransferResource extends Resource
 {
+    use AuthorizesErpResource;
+
     protected static ?string $model = FundTransfer::class;
 
     protected static ?string $navigationLabel = 'تحويلات بين الخزائن والمصارف';
@@ -30,20 +32,14 @@ class FundTransferResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
-    public static function shouldRegisterNavigation(): bool
+    protected static function createPermissions(): array
     {
-        $user = Auth::user();
-
-        return $user?->is_prog || $user?->can('ادخال تحويل');
+        return ['ادخال تحويل'];
     }
 
-    public static function canAccess(): bool
+    protected static function deletePermissions(): array
     {
-        $user = Auth::user();
-
-        return $user?->is_prog
-            || $user?->can('ادخال تحويل')
-            || $user?->can('الغاء تحويل');
+        return ['الغاء تحويل'];
     }
 
     public static function form(Schema $schema): Schema

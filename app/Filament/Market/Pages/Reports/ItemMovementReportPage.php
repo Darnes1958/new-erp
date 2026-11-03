@@ -9,6 +9,7 @@ use App\Models\Item;
 use App\Models\Warehouse;
 use App\Services\Excel\MarketExcelService;
 use App\Services\Market\ItemMovementReportService;
+use App\Support\Authz;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\DatePicker;
@@ -65,7 +66,7 @@ class ItemMovementReportPage extends Page implements HasActions, HasForms, HasTa
     {
         $user = Auth::user();
 
-        return $user?->is_prog || $user?->can('تقارير مخازن');
+        return \App\Support\Authz::can('تقارير مخازن', 'تقارير مخزون');
     }
 
     public static function canAccess(): bool
@@ -212,10 +213,24 @@ class ItemMovementReportPage extends Page implements HasActions, HasForms, HasTa
                     ->numeric(3),
                 TextColumn::make('price1')
                     ->label('السعر')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->formatStateUsing(function ($state, $record) {
+                        if (Authz::isPurchaseCostMovementType($record->type ?? null) && ! Authz::canViewBuyPrice()) {
+                            return null;
+                        }
+
+                        return $state;
+                    }),
                 TextColumn::make('sub_tot')
                     ->label('المجموع')
-                    ->numeric(3),
+                    ->numeric(3)
+                    ->formatStateUsing(function ($state, $record) {
+                        if (Authz::isPurchaseCostMovementType($record->type ?? null) && ! Authz::canViewBuyPrice()) {
+                            return null;
+                        }
+
+                        return $state;
+                    }),
             ])
             ->defaultSort(fn ($query) => app(ItemMovementReportService::class)->applyDefaultOrdering($query))
             ->emptyStateHeading($this->itemId ? 'لا توجد بيانات' : 'اختر صنفاً لعرض الحركة')
@@ -280,6 +295,7 @@ class ItemMovementReportPage extends Page implements HasActions, HasForms, HasTa
             itemName: (string) ($item?->name ?? ''),
             dateFrom: (string) $this->dateFrom,
             warehouseName: $warehouseName,
+            showBuyPrices: Authz::canViewBuyPrice(),
         );
     }
 }

@@ -8,7 +8,6 @@ use App\Filament\Market\Support\MarketNavigationGroup;
 use App\Models\WarehouseTransfer;
 use Filament\Resources\Resource;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class WarehouseTransferResource extends Resource
 {
@@ -28,17 +27,7 @@ class WarehouseTransferResource extends Resource
 
     public static function canAccess(): bool
     {
-        $user = Auth::user();
-
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->is_prog) {
-            return true;
-        }
-
-        return $user->can('نقل أصناف');
+        return \App\Support\Authz::can('نقل أصناف');
     }
 
     public static function shouldRegisterNavigation(): bool
