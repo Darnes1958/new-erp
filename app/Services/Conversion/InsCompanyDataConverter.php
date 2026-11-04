@@ -8,6 +8,7 @@ use App\Support\Conversion\LegacyConnectionNaming;
 use App\Support\Conversion\LegacySchemaDetector;
 use App\Support\Conversion\LegacySchemaKind;
 use App\Support\Conversion\LegacyUserStatusResolver;
+use App\Support\Conversion\UniqueUserEmailAllocator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -104,7 +105,7 @@ class InsCompanyDataConverter
      */
     protected function assertConnections(?array $only = null): void
     {
-        $targetSteps = ['payment_methods', 'master', 'items', 'sales', 'installments'];
+        $targetSteps = ['payment_methods', 'master', 'items', 'sales', 'installments', 'created_by'];
         $needsTarget = $only === null
             || count(array_intersect($only, $targetSteps)) > 0;
 
@@ -1148,26 +1149,34 @@ class InsCompanyDataConverter
             return $payload;
         })->all();
 
+        $emails = new UniqueUserEmailAllocator($targetCentral);
+        $seenEmails = [];
+
         foreach (array_chunk($rows, 50) as $chunk) {
-            DB::connection($targetCentral)->transaction(function () use ($targetCentral, $chunk): void {
+            DB::connection($targetCentral)->transaction(function () use ($targetCentral, $chunk, $emails, &$seenEmails): void {
                 DB::connection($targetCentral)->unprepared('SET IDENTITY_INSERT [users] ON');
 
                 foreach ($chunk as $row) {
                     $id = (int) $row['id'];
                     $payload = collect($row)->except('id')->all();
-
+                    $originalEmail = (string) ($payload['email'] ?? '');
                     $existingById = DB::connection($targetCentral)->table('users')->where('id', $id)->exists();
-                    $existingByEmail = filled($row['email'])
-                        && DB::connection($targetCentral)->table('users')->where('email', $row['email'])->exists();
+
+                    if ($existingById && $emails->isTaken($originalEmail, $id, $seenEmails)) {
+                        $currentEmail = (string) DB::connection($targetCentral)->table('users')->where('id', $id)->value('email');
+                        $payload['email'] = $currentEmail !== ''
+                            ? $currentEmail
+                            : $emails->allocate($originalEmail, $id, $seenEmails);
+                    } else {
+                        $payload['email'] = $emails->allocate($originalEmail, $existingById ? $id : null, $seenEmails);
+                    }
+
+                    $this->logUserEmailRewrite($id, $originalEmail, (string) $payload['email']);
+                    $seenEmails[mb_strtolower((string) $payload['email'])] = true;
+                    $row['email'] = $payload['email'];
 
                     if ($existingById) {
                         DB::connection($targetCentral)->table('users')->where('id', $id)->update($payload);
-
-                        continue;
-                    }
-
-                    if ($existingByEmail) {
-                        $this->log("Skipped user id {$id}: email [{$row['email']}] already exists in ERP (emp map will use existing account).");
 
                         continue;
                     }
@@ -1187,6 +1196,17 @@ class InsCompanyDataConverter
 
         $this->log('Imported '.count($rows).' user(s) for ['.$this->source.'] → ['.$this->target.'].');
         $this->log('Emp map entries: '.count($this->empToUserId));
+    }
+
+    protected function logUserEmailRewrite(int $userId, string $originalEmail, string $storedEmail): void
+    {
+        if (mb_strtolower(trim($originalEmail)) === mb_strtolower($storedEmail)) {
+            return;
+        }
+
+        $from = trim($originalEmail) === '' ? '(empty)' : trim($originalEmail);
+
+        $this->log("User id {$userId}: email [{$from}] already existed; stored as [{$storedEmail}].");
     }
 
     /**

@@ -19,7 +19,8 @@ class InsConvertFullCommand extends Command
         {--skip-migrate : Skip erp:migrate-company (schema already up to date)}
         {--skip-fifo : Skip FIFO rebuild (step 07)}
         {--only-sql : Skip PHP phases and run SQL scripts + FIFO + metrics (resume after SQL failure)}
-        {--resume : Resume after a failed run — clears installment tables and re-imports installments + remaining steps}';
+        {--resume : Resume after a failed run — clears installment tables and re-imports installments + remaining steps}
+        {--from= : Continue after failure without wiping data: users (users+created_by then SQL) or sql}';
 
     protected $description = 'Full INS → ERP conversion in one command (schema, PHP data, SQL scripts, FIFO, metrics)';
 
@@ -40,11 +41,21 @@ class InsConvertFullCommand extends Command
         }
 
         $resumeFromInstallments = (bool) $this->option('resume');
-        $onlySql = (bool) $this->option('only-sql');
+        $from = strtolower(trim((string) $this->option('from')));
+        $onlySql = (bool) $this->option('only-sql') || $from === 'sql';
+        $fromUsers = $from === 'users';
+
+        if ($fromUsers && $this->option('fresh')) {
+            $this->error('Do not combine --from=users with --fresh; that would wipe already converted company data.');
+
+            return self::FAILURE;
+        }
 
         try {
             if (! $onlySql) {
-                if ($this->option('fresh')) {
+                if ($fromUsers) {
+                    $this->warn('Continuing from users — company data already converted will be left as-is.');
+                } elseif ($this->option('fresh')) {
                     $this->runPhase('Company migrations (fresh)', function () use ($target): void {
                         Artisan::call('erp:migrate-company', [
                             'connection' => $target,
@@ -61,7 +72,12 @@ class InsConvertFullCommand extends Command
                     });
                 }
 
-                if (! $resumeFromInstallments) {
+                if ($fromUsers) {
+                    $this->runPhase('Users and created_by', function () use ($legacy, $target): void {
+                        $converter = new InsCompanyDataConverter($legacy, $target);
+                        $converter->convert(only: ['users', 'created_by']);
+                    });
+                } elseif (! $resumeFromInstallments) {
                     $this->runPhase('Register company', function () use ($legacy, $target): void {
                         $converter = new InsCompanyDataConverter($legacy, $target);
                         $converter->convert(only: ['register_company', 'company_settings']);

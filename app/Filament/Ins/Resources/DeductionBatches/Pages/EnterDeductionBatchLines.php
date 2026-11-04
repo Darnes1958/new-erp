@@ -8,7 +8,9 @@ use App\Enums\InstallmentDeductionType;
 use App\Filament\Ins\Resources\DeductionBatches\DeductionBatchResource;
 use App\Models\DeductionBatch;
 use App\Models\DeductionBatchLine;
+use App\Models\InstallmentCancelledContract;
 use App\Models\InstallmentContract;
+use App\Models\InstallmentContractArchive;
 use App\Models\WrongDeductionAccount;
 use App\Services\Installments\BankAccountSearchService;
 use App\Enums\DeductionBatchPostedType;
@@ -36,11 +38,12 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\On;
 
 class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
 {
@@ -70,11 +73,16 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
 
     public string $statusColor = 'danger';
 
+    public array $batchFilters = [
+        'display_type' => null,
+    ];
+
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
         $this->batch = $this->record->load(['payrollBank', 'installmentBank']);
         $this->lineData = $this->defaultLineData();
+        $this->batchFiltersForm->fill($this->batchFilters);
 
         if ($this->batch->isOpen()) {
             $rematched = app(DeductionBatchService::class)->rematchWrongLines($this->batch);
@@ -86,6 +94,20 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                     ->send();
             }
         }
+    }
+
+    public function batchFiltersForm(Schema $schema): Schema
+    {
+        return $schema
+            ->statePath('batchFilters')
+            ->components([
+                Select::make('display_type')
+                    ->label('نوع الخصم')
+                    ->options(DeductionBatchPostedType::class)
+                    ->placeholder('الكل')
+                    ->live()
+                    ->afterStateUpdated(fn (): mixed => $this->resetTable()),
+            ]);
     }
 
     public function lineForm(Schema $schema): Schema
@@ -293,10 +315,23 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => DeductionBatchLine::query()->where('deduction_batch_id', $this->batch->id))
+            ->query(fn (): Builder => $this->applyDisplayTypeFilter(
+                DeductionBatchLine::query()
+                    ->where('deduction_batch_id', $this->batch->id)
+                    ->with(['contractable' => function ($morphTo): void {
+                        $morphTo->morphWith([
+                            InstallmentContract::class => ['customer'],
+                            InstallmentContractArchive::class => ['customer'],
+                            InstallmentCancelledContract::class => ['customer'],
+                        ]);
+                    }])
+            ))
             ->heading(fn (): HtmlString => $this->typeBreakdownHtml())
             ->extraAttributes(['class' => 'deduction-batch-numbered-pagination'])
             ->extremePaginationLinks()
+            ->searchable()
+            ->searchPlaceholder('بحث بالاسم أو رقم الحساب')
+            ->persistSearchInSession(false)
             ->defaultSort('deduction_date', 'desc')
             ->columns([
                 TextColumn::make('contractable_id')
@@ -304,10 +339,31 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                     ->sortable(),
                 TextColumn::make('account_number')
                     ->label('الحساب')
+                    ->sortable()
                     ->searchable(),
-                TextColumn::make('contractable.customer.name')
+                TextColumn::make('party_name')
                     ->label('الزبون')
-                    ->placeholder(fn (DeductionBatchLine $record): ?string => $record->entry_type === DeductionBatchEntryType::Wrong ? $record->notes : null),
+                    ->getStateUsing(fn (DeductionBatchLine $record): ?string => $this->linePartyName($record))
+                    ->searchable(query: function (Builder $query, string $search): void {
+                        $query->where(function (Builder $query) use ($search): void {
+                            $query
+                                ->where('notes', 'like', "%{$search}%")
+                                ->orWhereHasMorph(
+                                    'contractable',
+                                    [
+                                        InstallmentContract::class,
+                                        InstallmentContractArchive::class,
+                                        InstallmentCancelledContract::class,
+                                    ],
+                                    function (Builder $query) use ($search): void {
+                                        $query->whereHas(
+                                            'customer',
+                                            fn (Builder $customer): Builder => $customer->where('name', 'like', "%{$search}%"),
+                                        );
+                                    },
+                                );
+                        });
+                    }),
                 TextColumn::make('display_type')
                     ->label('النوع')
                     ->badge()
@@ -329,35 +385,6 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                     ->toggledHiddenByDefault(),
             ])
             ->filters([
-                SelectFilter::make('display_type')
-                    ->label('نوع الخصم')
-                    ->options(DeductionBatchPostedType::class)
-                    ->query(function (Builder $query, array $data): Builder {
-                        $type = DeductionBatchPostedType::tryFrom((int) ($data['value'] ?? 0));
-
-                        if ($type === null) {
-                            return $query;
-                        }
-
-                        $unpostedEntry = match ($type) {
-                            DeductionBatchPostedType::Normal => DeductionBatchEntryType::Active,
-                            DeductionBatchPostedType::Archive => DeductionBatchEntryType::Archive,
-                            DeductionBatchPostedType::Wrong => DeductionBatchEntryType::Wrong,
-                            DeductionBatchPostedType::Cancelled => DeductionBatchEntryType::Cancelled,
-                            default => null,
-                        };
-
-                        return $query->where(function (Builder $query) use ($type, $unpostedEntry): void {
-                            $query->where('posted_type', $type->value);
-
-                            if ($unpostedEntry !== null) {
-                                $query->orWhere(function (Builder $query) use ($unpostedEntry): void {
-                                    $query->whereNull('posted_type')
-                                        ->where('entry_type', $unpostedEntry->value);
-                                });
-                            }
-                        });
-                    }),
                 Filter::make('deduction_date')
                     ->label('التاريخ')
                     ->schema([
@@ -379,6 +406,29 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                     }),
             ])
             ->recordActions([
+                Action::make('correctWrong')
+                    ->label('تصحيح')
+                    ->icon('heroicon-o-check')
+                    ->color('success')
+                    ->tooltip('تصحيح كل الأقساط الواردة بالخطأ لنفس الحساب')
+                    ->visible(fn (DeductionBatchLine $record): bool => $this->isWrongLine($record))
+                    ->modalHeading('تصحيح أقساط واردة بالخطأ')
+                    ->modalWidth('7xl')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('إغلاق')
+                    ->modalContent(function (DeductionBatchLine $record): View {
+                        $account = trim((string) $record->account_number);
+                        $customerName = trim((string) ($this->linePartyName($record) ?? ''));
+
+                        return view('filament.ins.modals.correct-wrong-batch-line', [
+                            'lineId' => $record->id,
+                            'accountNumber' => $account,
+                            'customerName' => $customerName,
+                            'payrollBankId' => $this->batch->payroll_bank_id,
+                            'siblingCount' => app(DeductionBatchService::class)
+                                ->countWrongLinesForAccount($this->batch, $account),
+                        ]);
+                    }),
                 Action::make('deleteLine')
                     ->icon('heroicon-o-trash')
                     ->iconButton()
@@ -391,6 +441,67 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                         Notification::make()->title('تم الحذف')->success()->send();
                     }),
             ]);
+    }
+
+    #[On('wrong-batch-line-corrected')]
+    public function onWrongBatchLineCorrected(int $count = 0): void
+    {
+        if (method_exists($this, 'unmountTableAction')) {
+            $this->unmountTableAction();
+        }
+
+        $this->batch->refresh();
+        $this->resetTable();
+
+        Notification::make()
+            ->title('تم تصحيح '.$count.' قسطاً لنفس الحساب')
+            ->success()
+            ->send();
+    }
+
+    protected function applyDisplayTypeFilter(Builder $query): Builder
+    {
+        $type = DeductionBatchPostedType::tryFrom((int) ($this->batchFilters['display_type'] ?? 0));
+
+        if ($type === null) {
+            return $query;
+        }
+
+        $unpostedEntry = match ($type) {
+            DeductionBatchPostedType::Normal => DeductionBatchEntryType::Active,
+            DeductionBatchPostedType::Archive => DeductionBatchEntryType::Archive,
+            DeductionBatchPostedType::Wrong => DeductionBatchEntryType::Wrong,
+            DeductionBatchPostedType::Cancelled => DeductionBatchEntryType::Cancelled,
+            default => null,
+        };
+
+        return $query->where(function (Builder $query) use ($type, $unpostedEntry): void {
+            $query->where('posted_type', $type->value);
+
+            if ($unpostedEntry !== null) {
+                $query->orWhere(function (Builder $query) use ($unpostedEntry): void {
+                    $query->whereNull('posted_type')
+                        ->where('entry_type', $unpostedEntry->value);
+                });
+            }
+        });
+    }
+
+    protected function linePartyName(DeductionBatchLine $record): ?string
+    {
+        $contractable = $record->contractable;
+
+        if ($contractable && method_exists($contractable, 'customer')) {
+            return $contractable->customer?->name ?: $record->notes;
+        }
+
+        return $record->notes;
+    }
+
+    protected function isWrongLine(DeductionBatchLine $record): bool
+    {
+        return $record->entry_type === DeductionBatchEntryType::Wrong
+            || $record->posted_type === DeductionBatchPostedType::Wrong;
     }
 
     public function typeBreakdownHtml(): HtmlString

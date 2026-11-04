@@ -4,6 +4,7 @@ namespace App\Services\Conversion;
 
 use App\Support\Conversion\LegacyConnectionNaming;
 use App\Support\Conversion\LegacyUserStatusResolver;
+use App\Support\Conversion\UniqueUserEmailAllocator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use RuntimeException;
@@ -21,11 +22,14 @@ class AuthDataConverter
 
     protected LegacyUserStatusResolver $userStatusResolver;
 
+    protected UniqueUserEmailAllocator $emails;
+
     public function __construct(
         string $source = 'InsFila',
     ) {
         $this->source = $source;
         $this->userStatusResolver = LegacyUserStatusResolver::forConnection($source);
+        $this->emails = new UniqueUserEmailAllocator($this->centralConnection());
     }
 
     /**
@@ -252,7 +256,7 @@ class AuthDataConverter
 
         foreach ($rows as &$row) {
             $originalEmail = (string) ($row['email'] ?? '');
-            $row['email'] = $this->uniqueEmail($originalEmail, null, $seenEmails);
+            $row['email'] = $this->emails->allocate($originalEmail, null, $seenEmails);
             $this->logEmailRewrite((int) $row['id'], $originalEmail, (string) $row['email']);
             $seenEmails[mb_strtolower((string) $row['email'])] = true;
         }
@@ -287,7 +291,7 @@ class AuthDataConverter
 
             $existingById = $this->central()->table('users')->where('id', $id)->exists();
             $originalEmail = (string) ($payload['email'] ?? '');
-            $payload['email'] = $this->uniqueEmail($originalEmail, $existingById ? $id : null);
+            $payload['email'] = $this->emails->allocate($originalEmail, $existingById ? $id : null);
             $this->logEmailRewrite($id, $originalEmail, (string) $payload['email']);
 
             if ($existingById) {
@@ -329,83 +333,6 @@ class AuthDataConverter
             'updated_at' => $row->updated_at,
             ...$this->conversionUserColumns($row),
         ];
-    }
-
-    /**
-     * @param  array<string, true>  $seenEmails
-     */
-    protected function uniqueEmail(string $email, ?int $ignoreUserId = null, array $seenEmails = []): string
-    {
-        $email = trim($email);
-
-        if ($email === '') {
-            $email = 'user'.($ignoreUserId ?? random_int(100000, 999999)).'@imported.invalid';
-        }
-
-        if (! $this->emailIsTaken($email, $ignoreUserId, $seenEmails)) {
-            return $email;
-        }
-
-        [$local, $domain] = $this->splitEmail($email);
-
-        for ($attempt = 0; $attempt < 30; $attempt++) {
-            $candidate = $this->composeEmail($local, (string) random_int(100000, 999999), $domain);
-
-            if (! $this->emailIsTaken($candidate, $ignoreUserId, $seenEmails)) {
-                return $candidate;
-            }
-        }
-
-        throw new RuntimeException("Could not allocate a unique email for [{$email}].");
-    }
-
-    /**
-     * @param  array<string, true>  $seenEmails
-     */
-    protected function emailIsTaken(string $email, ?int $ignoreUserId, array $seenEmails): bool
-    {
-        if (isset($seenEmails[mb_strtolower($email)])) {
-            return true;
-        }
-
-        $query = $this->central()->table('users')->where('email', $email);
-
-        if ($ignoreUserId !== null) {
-            $query->where('id', '<>', $ignoreUserId);
-        }
-
-        return $query->exists();
-    }
-
-    /** @return array{0: string, 1: string} */
-    protected function splitEmail(string $email): array
-    {
-        $at = strrpos($email, '@');
-
-        if ($at === false) {
-            return [$email !== '' ? $email : 'user', 'imported.invalid'];
-        }
-
-        $local = substr($email, 0, $at);
-        $domain = substr($email, $at + 1);
-
-        return [
-            $local !== '' ? $local : 'user',
-            $domain !== '' ? $domain : 'imported.invalid',
-        ];
-    }
-
-    protected function composeEmail(string $local, string $suffix, string $domain): string
-    {
-        $candidate = $local.'.'.$suffix.'@'.$domain;
-
-        if (strlen($candidate) <= 255) {
-            return $candidate;
-        }
-
-        $maxLocal = max(1, 255 - strlen($suffix) - strlen($domain) - 2);
-
-        return substr($local, 0, $maxLocal).'.'.$suffix.'@'.$domain;
     }
 
     protected function logEmailRewrite(int $userId, string $originalEmail, string $storedEmail): void

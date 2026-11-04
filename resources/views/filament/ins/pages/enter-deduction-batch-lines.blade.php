@@ -18,6 +18,9 @@
         </div>
 
         <div style="min-width: 0; overflow-x: auto;">
+            <div style="max-width: 18rem; margin-bottom: 0.75rem;">
+                {{ $this->batchFiltersForm }}
+            </div>
             {{ $this->table }}
         </div>
     </div>

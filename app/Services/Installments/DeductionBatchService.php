@@ -439,6 +439,133 @@ class DeductionBatchService
         });
     }
 
+    public function countWrongLinesForAccount(DeductionBatch $batch, string $accountNumber): int
+    {
+        $lines = $this->wrongLinesForAccount($batch, $accountNumber)->count();
+
+        $wrongs = WrongDeduction::on($batch->getConnectionName())
+            ->where('account_number', trim($accountNumber))
+            ->whereIn('status', [InstallmentRecordStatus::Legacy, InstallmentRecordStatus::Open])
+            ->when(
+                $batch->payroll_bank_id,
+                fn ($query) => $query->where('payroll_bank_id', $batch->payroll_bank_id),
+            )
+            ->count();
+
+        return max($lines, $wrongs);
+    }
+
+    /**
+     * Correct every wrong batch line (and posted wrong deduction) that shares
+     * this account number, using the selected contract. The batch account is
+     * treated as the bank's correct number.
+     */
+    public function correctWrongAccountLines(DeductionBatchLine $line, InstallmentContract $contract): int
+    {
+        $accountNumber = trim((string) $line->account_number);
+
+        if ($accountNumber === '') {
+            throw ValidationException::withMessages([
+                'account_number' => 'لا يوجد رقم حساب على هذا السطر.',
+            ]);
+        }
+
+        $batch = $line->batch()->first() ?? $line->batch;
+        $connection = $batch->getConnectionName();
+        $wrongDeductions = app(WrongDeductionService::class);
+
+        return DB::connection($connection)->transaction(function () use ($batch, $connection, $accountNumber, $contract, $wrongDeductions): int {
+            $wrongLines = $this->wrongLinesForAccount($batch, $accountNumber);
+            $processed = 0;
+            $batchIds = [];
+
+            if ($wrongLines->isEmpty()) {
+                $openWrong = WrongDeduction::on($batch->getConnectionName())
+                    ->where('account_number', $accountNumber)
+                    ->whereIn('status', [InstallmentRecordStatus::Legacy, InstallmentRecordStatus::Open])
+                    ->when(
+                        $batch->payroll_bank_id,
+                        fn ($query) => $query->where('payroll_bank_id', $batch->payroll_bank_id),
+                    )
+                    ->orderBy('deduction_date')
+                    ->orderBy('id')
+                    ->first();
+
+                if ($openWrong) {
+                    $wrongDeductions->correctToContract($openWrong, $contract);
+
+                    return max($this->countWrongLinesForAccount($batch, $accountNumber), 1);
+                }
+            }
+
+            foreach ($wrongLines as $wrongLine) {
+                $targetBatch = $wrongLine->batch()->first() ?? $batch;
+
+                if ($targetBatch->isOpen()) {
+                    $wrongDeductions->relinkLine($wrongLine, $contract, null);
+                    $processed++;
+                    continue;
+                }
+
+                $result = $this->deductionService->record(
+                    $contract,
+                    $wrongLine->deduction_date ?? now(),
+                    (float) $wrongLine->amount,
+                    InstallmentDeductionType::Bank->value,
+                    notes: 'تصحيح قسط بالخطأ',
+                    batchId: (int) $wrongLine->deduction_batch_id,
+                );
+
+                $wrongDeductions->relinkLine($wrongLine, $contract, $result['posted_type']);
+                $batchIds[(int) $targetBatch->id] = true;
+                $processed++;
+            }
+
+            $wrongDeductions->applyCorrectAccountNumber(
+                $contract,
+                $accountNumber,
+                $batch->payroll_bank_id,
+            );
+            $wrongDeductions->markAccountCorrected($accountNumber, $batch->payroll_bank_id);
+
+            foreach (array_keys($batchIds) as $batchId) {
+                $updatedBatch = DeductionBatch::on($connection)->find($batchId);
+
+                if ($updatedBatch) {
+                    $wrongDeductions->refreshPostedBatchTotals($updatedBatch);
+                }
+            }
+
+            app(InstallmentContractMetricsService::class)->recalculate($contract->refresh());
+
+            return max($processed, 1);
+        });
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, DeductionBatchLine>
+     */
+    protected function wrongLinesForAccount(DeductionBatch $batch, string $accountNumber): \Illuminate\Database\Eloquent\Collection
+    {
+        $accountNumber = trim($accountNumber);
+
+        $query = DeductionBatchLine::on($batch->getConnectionName())
+            ->whereRaw('LTRIM(RTRIM(account_number)) = ?', [$accountNumber])
+            ->where(function ($query): void {
+                $query->where('entry_type', DeductionBatchEntryType::Wrong)
+                    ->orWhere('posted_type', DeductionBatchPostedType::Wrong);
+            });
+
+        if ($batch->payroll_bank_id) {
+            $query->whereHas(
+                'batch',
+                fn ($batchQuery) => $batchQuery->where('payroll_bank_id', $batch->payroll_bank_id),
+            );
+        }
+
+        return $query->orderBy('deduction_date')->orderBy('id')->get();
+    }
+
     public function deleteOpenBatch(DeductionBatch $batch): void
     {
         if (! $batch->isOpen()) {
