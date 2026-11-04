@@ -248,6 +248,16 @@ class AuthDataConverter
             ->map(fn ($row) => $this->legacyUserRowToPayload($row, (string) $row->company))
             ->all();
 
+        $seenEmails = [];
+
+        foreach ($rows as &$row) {
+            $originalEmail = (string) ($row['email'] ?? '');
+            $row['email'] = $this->uniqueEmail($originalEmail, null, $seenEmails);
+            $this->logEmailRewrite((int) $row['id'], $originalEmail, (string) $row['email']);
+            $seenEmails[mb_strtolower((string) $row['email'])] = true;
+        }
+        unset($row);
+
         $this->insertWithIdentity('users', $rows);
 
         return array_column($rows, 'id');
@@ -276,18 +286,13 @@ class AuthDataConverter
             unset($payload['id']);
 
             $existingById = $this->central()->table('users')->where('id', $id)->exists();
-            $existingByEmail = filled($row->email)
-                && $this->central()->table('users')->where('email', $row->email)->exists();
+            $originalEmail = (string) ($payload['email'] ?? '');
+            $payload['email'] = $this->uniqueEmail($originalEmail, $existingById ? $id : null);
+            $this->logEmailRewrite($id, $originalEmail, (string) $payload['email']);
 
             if ($existingById) {
                 $this->central()->table('users')->where('id', $id)->update($payload);
                 $userIds[] = $id;
-
-                continue;
-            }
-
-            if ($existingByEmail) {
-                $this->log("Skipped user id {$id}: email [{$row->email}] already exists.");
 
                 continue;
             }
@@ -324,6 +329,94 @@ class AuthDataConverter
             'updated_at' => $row->updated_at,
             ...$this->conversionUserColumns($row),
         ];
+    }
+
+    /**
+     * @param  array<string, true>  $seenEmails
+     */
+    protected function uniqueEmail(string $email, ?int $ignoreUserId = null, array $seenEmails = []): string
+    {
+        $email = trim($email);
+
+        if ($email === '') {
+            $email = 'user'.($ignoreUserId ?? random_int(100000, 999999)).'@imported.invalid';
+        }
+
+        if (! $this->emailIsTaken($email, $ignoreUserId, $seenEmails)) {
+            return $email;
+        }
+
+        [$local, $domain] = $this->splitEmail($email);
+
+        for ($attempt = 0; $attempt < 30; $attempt++) {
+            $candidate = $this->composeEmail($local, (string) random_int(100000, 999999), $domain);
+
+            if (! $this->emailIsTaken($candidate, $ignoreUserId, $seenEmails)) {
+                return $candidate;
+            }
+        }
+
+        throw new RuntimeException("Could not allocate a unique email for [{$email}].");
+    }
+
+    /**
+     * @param  array<string, true>  $seenEmails
+     */
+    protected function emailIsTaken(string $email, ?int $ignoreUserId, array $seenEmails): bool
+    {
+        if (isset($seenEmails[mb_strtolower($email)])) {
+            return true;
+        }
+
+        $query = $this->central()->table('users')->where('email', $email);
+
+        if ($ignoreUserId !== null) {
+            $query->where('id', '<>', $ignoreUserId);
+        }
+
+        return $query->exists();
+    }
+
+    /** @return array{0: string, 1: string} */
+    protected function splitEmail(string $email): array
+    {
+        $at = strrpos($email, '@');
+
+        if ($at === false) {
+            return [$email !== '' ? $email : 'user', 'imported.invalid'];
+        }
+
+        $local = substr($email, 0, $at);
+        $domain = substr($email, $at + 1);
+
+        return [
+            $local !== '' ? $local : 'user',
+            $domain !== '' ? $domain : 'imported.invalid',
+        ];
+    }
+
+    protected function composeEmail(string $local, string $suffix, string $domain): string
+    {
+        $candidate = $local.'.'.$suffix.'@'.$domain;
+
+        if (strlen($candidate) <= 255) {
+            return $candidate;
+        }
+
+        $maxLocal = max(1, 255 - strlen($suffix) - strlen($domain) - 2);
+
+        return substr($local, 0, $maxLocal).'.'.$suffix.'@'.$domain;
+    }
+
+    protected function logEmailRewrite(int $userId, string $originalEmail, string $storedEmail): void
+    {
+        if (mb_strtolower(trim($originalEmail)) === mb_strtolower($storedEmail)) {
+            return;
+        }
+
+        $from = trim($originalEmail) === '' ? '(empty)' : trim($originalEmail);
+
+        $this->log("User id {$userId}: email [{$from}] already existed; stored as [{$storedEmail}].");
     }
 
     /**
