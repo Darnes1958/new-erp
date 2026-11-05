@@ -45,13 +45,12 @@ class WarehouseStockReportService
      */
     public function summary(?int $warehouseId = null, bool $includeZero = false, ?int $itemTypeId = null): array
     {
-        $row = $this->reportQuery($warehouseId, $includeZero, $itemTypeId)
+        $total = $this->reportQuery($warehouseId, $includeZero, $itemTypeId)
             ->reorder()
-            ->selectRaw('COALESCE(SUM(warehouse_stock_report_entries.warehouse_cost_total), 0) AS warehouse_cost_total')
-            ->first();
+            ->sum('warehouse_stock_report_entries.warehouse_cost_total');
 
         return [
-            'warehouse_cost_total' => round((float) ($row->warehouse_cost_total ?? 0), 3),
+            'warehouse_cost_total' => round((float) $total, 3),
         ];
     }
 }

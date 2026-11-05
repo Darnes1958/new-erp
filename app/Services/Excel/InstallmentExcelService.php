@@ -6,6 +6,7 @@ use App\Enums\BankReportType;
 use App\Exports\Installments\BankCommissionExport;
 use App\Exports\Installments\BankReportExport;
 use App\Exports\Installments\BankTotalsExport;
+use App\Exports\Installments\CollectedTotalsExport;
 use App\Exports\Installments\BranchCommissionExport;
 use App\Exports\Installments\InstallmentReturnsExport;
 use App\Exports\Installments\InstallmentStopExport;
@@ -116,6 +117,21 @@ class InstallmentExcelService
                 reportTitle: $reportTitle ?? 'تقرير عمولة المصارف',
             ),
             'bank-commission.xlsx',
+        );
+    }
+
+    /**
+     * @param  Collection<int, PayrollBank>  $rows
+     */
+    public function collectedTotalsReport(Collection $rows, ?string $reportTitle = null): BinaryFileResponse
+    {
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new CollectedTotalsExport(
+                rows: $rows->sortBy('name')->values(),
+                company: OurCompany::forCurrentUser(),
+                reportTitle: $reportTitle ?? 'تقرير إجمالي المحصلة',
+            ),
+            'collected-totals.xlsx',
         );
     }
 

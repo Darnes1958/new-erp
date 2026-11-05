@@ -83,6 +83,12 @@ class InstallmentReportsHub extends Page
                 'status' => 'ready',
             ],
             [
+                'title' => 'اجمالي المحصلة',
+                'description' => 'إجمالي الأقساط المحصلة والمفترض تحصيلها ونسبة التحصيل لكل مصرف تجميعي خلال فترة محددة.',
+                'url' => CollectedTotalsReportPage::getUrl(),
+                'status' => 'ready',
+            ],
+            [
                 'title' => 'إجمالي الفروع',
                 'description' => 'ملخص أرقام الفروع حسب الحسابات التجميعية.',
                 'url' => BranchTotalsReportPage::getUrl(),
