@@ -17,6 +17,7 @@ class WarehouseStockPdfService
         Collection $rows,
         array $summary,
         ?string $warehouseName,
+        ?string $itemTypeName = null,
         bool $showCosts,
         bool $multiWarehouse,
     ): PdfBuilder {
@@ -25,6 +26,7 @@ class WarehouseStockPdfService
             'summary' => $summary,
             'company' => OurCompany::forCurrentUser(),
             'warehouseName' => $warehouseName,
+            'itemTypeName' => $itemTypeName,
             'showCosts' => $showCosts,
             'multiWarehouse' => $multiWarehouse,
             'repDate' => now()->toDateString(),

@@ -52,11 +52,18 @@
             <label style="font-size: 12pt; font-weight: bolder;">{{ $warehouseName }}</label>
         </div>
     @endif
+    @if (! empty($itemTypeName))
+        <div>
+            <label style="font-size: 14pt; margin-right: 12px;">التصنيف:</label>
+            <label style="font-size: 12pt; font-weight: bolder;">{{ $itemTypeName }}</label>
+        </div>
+    @endif
     <br>
 
     <table align="right">
         <thead>
             <tr style="background: lightgray;">
+                <th style="width: 12%;">التصنيف</th>
                 @if ($multiWarehouse && ! $warehouseName)
                     <th style="width: 15%;">المكان</th>
                 @endif
@@ -77,6 +84,7 @@
         <tbody>
             @foreach ($rows as $row)
                 <tr>
+                    <td>{{ $row->item_type_name ?: '—' }}</td>
                     @if ($multiWarehouse && ! $warehouseName)
                         <td>{{ $row->warehouse_name }}</td>
                     @endif
@@ -100,6 +108,7 @@
                     @if ($multiWarehouse && ! $warehouseName)
                         <td></td>
                     @endif
+                    <td></td>
                     <td></td>
                     <td></td>
                     @if ($multiWarehouse)

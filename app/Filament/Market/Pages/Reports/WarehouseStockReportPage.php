@@ -5,6 +5,7 @@ namespace App\Filament\Market\Pages\Reports;
 use App\Filament\Ins\Support\InstallmentListPrintActions;
 use App\Filament\Market\Pages\Reports\Concerns\InteractsWithMarketReportExports;
 use App\Filament\Market\Support\MarketNavigationGroup;
+use App\Models\ItemType;
 use App\Models\Warehouse;
 use App\Services\Excel\MarketExcelService;
 use App\Services\Market\WarehouseStockReportService;
@@ -56,6 +57,8 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
 
     public ?int $warehouseId = null;
 
+    public ?int $itemTypeId = null;
+
     public bool $includeZero = false;
 
     public static function shouldRegisterNavigation(): bool
@@ -74,6 +77,7 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
     {
         $this->filtersForm->fill([
             'warehouseId' => $this->warehouseId,
+            'itemTypeId' => $this->itemTypeId,
             'includeZero' => $this->includeZero,
         ]);
     }
@@ -91,6 +95,21 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
             ->components([
                 Grid::make()
                     ->schema([
+                        Select::make('itemTypeId')
+                            ->columnSpan(2)
+                            ->label('التصنيف')
+                            ->options(fn (): array => ItemType::query()
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                                ->all())
+                            ->searchable()
+                            ->preload()
+                            ->placeholder('كل التصنيفات')
+                            ->live()
+                            ->afterStateUpdated(function (?int $state): void {
+                                $this->itemTypeId = $state;
+                                $this->resetTable();
+                            }),
                         Select::make('warehouseId')
                             ->columnSpan(2)
                             ->label('حسب المكان')
@@ -130,7 +149,7 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
                             ->columnSpan(2)
                             ->extraAttributes(['class' => 'market-compact-exports']),
                     ])
-                    ->columns(6),
+                    ->columns(8),
             ]);
     }
 
@@ -147,6 +166,13 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
         return $table
             ->query(fn (): Builder => $this->buildReportQuery())
             ->columns([
+                TextColumn::make('item_type_name')
+                    ->label('التصنيف')
+                    ->placeholder('—')
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('stock_item_types.name', $direction))
+                    ->searchable(query: function (Builder $query, string $search): void {
+                        $query->where('stock_item_types.name', 'like', "%{$search}%");
+                    }),
                 TextColumn::make('warehouse_name')
                     ->label('المكان')
                     ->sortable()
@@ -208,6 +234,7 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
         return app(WarehouseStockReportService::class)->reportQuery(
             $this->warehouseId,
             $this->includeZero,
+            $this->itemTypeId,
         );
     }
 
@@ -232,13 +259,19 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
         }
 
         $service = app(WarehouseStockReportService::class);
-        $summary = $service->summary($this->warehouseId, $this->includeZero);
+        $summary = $service->summary($this->warehouseId, $this->includeZero, $this->itemTypeId);
         $warehouseName = $this->warehouseId
             ? Warehouse::query()->find($this->warehouseId)?->name
+            : null;
+        $itemTypeName = $this->itemTypeId
+            ? ItemType::query()->find($this->itemTypeId)?->name
             : null;
         $title = 'تقرير عن المخزون — '.now()->toDateString();
         if ($warehouseName) {
             $title .= ' — '.$warehouseName;
+        }
+        if ($itemTypeName) {
+            $title .= ' — '.$itemTypeName;
         }
 
         return app(MarketExcelService::class)->warehouseStock(
@@ -264,9 +297,12 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
         }
 
         $service = app(WarehouseStockReportService::class);
-        $summary = $service->summary($this->warehouseId, $this->includeZero);
+        $summary = $service->summary($this->warehouseId, $this->includeZero, $this->itemTypeId);
         $warehouseName = $this->warehouseId
             ? Warehouse::query()->find($this->warehouseId)?->name
+            : null;
+        $itemTypeName = $this->itemTypeId
+            ? ItemType::query()->find($this->itemTypeId)?->name
             : null;
 
         return PdfDownload::streamed(
@@ -274,6 +310,7 @@ class WarehouseStockReportPage extends Page implements HasActions, HasForms, Has
                 rows: $rows,
                 summary: $summary,
                 warehouseName: $warehouseName,
+                itemTypeName: $itemTypeName,
                 showCosts: $showCosts,
                 multiWarehouse: CompanySettings::multiWarehouse(),
             ),

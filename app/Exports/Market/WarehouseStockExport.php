@@ -44,7 +44,9 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
 
     public function map($row): array
     {
-        $columns = [];
+        $columns = [
+            Utf8Text::clean($row->item_type_name ?? ''),
+        ];
 
         if ($this->multiWarehouse) {
             $columns[] = Utf8Text::clean($row->warehouse_name);
@@ -72,7 +74,7 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
 
     public function headings(): array
     {
-        $header = [];
+        $header = ['التصنيف'];
 
         if ($this->multiWarehouse) {
             $header[] = 'المكان';
@@ -119,6 +121,8 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
                 foreach ($this->rows as $row) {
                     $column = 'A';
 
+                    $sheet->setCellValue($column++.$rowIndex, Utf8Text::clean($row->item_type_name ?? ''));
+
                     if ($this->multiWarehouse) {
                         $sheet->setCellValue($column++.$rowIndex, Utf8Text::clean($row->warehouse_name));
                     }
@@ -164,7 +168,7 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
                     ->getAlignment()
                     ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                $numericStart = $this->multiWarehouse ? 'D' : 'C';
+                $numericStart = $this->multiWarehouse ? 'E' : 'D';
                 $sheet->getStyle($numericStart.self::DATA_START_ROW.':'.$lastColumn.($rowIndex - 1))
                     ->getNumberFormat()
                     ->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
@@ -174,7 +178,7 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
 
     protected function resolveLastColumn(): string
     {
-        $columns = 3;
+        $columns = 4;
 
         if ($this->multiWarehouse) {
             $columns += 2;
@@ -191,7 +195,7 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
 
     protected function resolveTotalColumn(): string
     {
-        $offset = 3;
+        $offset = 4;
 
         if ($this->multiWarehouse) {
             $offset += 2;
