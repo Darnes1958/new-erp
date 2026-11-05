@@ -14,6 +14,13 @@ class CustomerLedgerEntriesView
             $parts[] = $this->installmentDeductionsSql();
         }
 
+        if (
+            Schema::connection($connection)->hasTable('installment_deduction_archives')
+            && Schema::connection($connection)->hasTable('installment_contract_archives')
+        ) {
+            $parts[] = $this->installmentDeductionArchivesSql();
+        }
+
         if (Schema::connection($connection)->hasTable('installment_surplus')) {
             $parts[] = $this->installmentSurplusSql();
         }
@@ -23,7 +30,7 @@ class CustomerLedgerEntriesView
         }
 
         if (Schema::connection($connection)->hasTable('installment_suspended')) {
-            $parts[] = $this->installmentReturnsSql();
+            $parts[] = $this->installmentReturnsSql($connection);
         }
 
         $lines = implode("\n\n    UNION ALL\n\n", $parts);
@@ -157,6 +164,34 @@ SELECT
 SQL;
     }
 
+    protected function installmentDeductionArchivesSql(): string
+    {
+        return <<<'SQL'
+SELECT
+        ica.customer_id,
+        c.name,
+        ida.deduction_date,
+        ida.id,
+        CAST(18 AS int),
+        CASE ida.deduction_type_id
+            WHEN 1 THEN N'نقداً'
+            WHEN 2 THEN N'المصرف'
+            WHEN 3 THEN N'صك'
+            WHEN 4 THEN N'إلكتروني'
+            ELSE N'—'
+        END,
+        CAST(0 AS decimal(14, 3)),
+        ida.deducted_amount,
+        COALESCE(ida.notes, CONCAT(N'عقد أرشيف رقم ', CAST(ica.id AS nvarchar(20)))),
+        CAST(4 AS int),
+        ida.id
+    FROM installment_deduction_archives ida
+    INNER JOIN installment_contract_archives ica ON ica.id = ida.installment_contract_id
+    INNER JOIN customers c ON c.id = ica.customer_id
+    WHERE ica.customer_id IS NOT NULL
+SQL;
+    }
+
     protected function installmentSurplusSql(): string
     {
         return <<<'SQL'
@@ -224,9 +259,9 @@ SELECT
 SQL;
     }
 
-    protected function installmentReturnsSql(): string
+    protected function installmentReturnsSql(string $connection): string
     {
-        return <<<'SQL'
+        $sql = <<<'SQL'
 SELECT
         ic.customer_id,
         c.name,
@@ -244,6 +279,35 @@ SELECT
     INNER JOIN customers c ON c.id = ic.customer_id
     WHERE s.installment_contract_id IS NOT NULL
       AND ic.customer_id IS NOT NULL
+SQL;
+
+        if (! Schema::connection($connection)->hasTable('installment_contract_archives')) {
+            return $sql;
+        }
+
+        return $sql.<<<'SQL'
+
+
+    UNION ALL
+
+    SELECT
+        ica.customer_id,
+        c.name,
+        s.suspended_date,
+        s.id,
+        CAST(20 AS int),
+        N'—',
+        s.amount,
+        CAST(0 AS decimal(14, 3)),
+        CONCAT(N'ترجيع — عقد أرشيف رقم ', CAST(ica.id AS nvarchar(20))),
+        CAST(7 AS int),
+        s.id
+    FROM installment_suspended s
+    INNER JOIN installment_contract_archives ica
+        ON s.contractable_type = N'installment_contract_archive'
+        AND s.contractable_id = ica.id
+    INNER JOIN customers c ON c.id = ica.customer_id
+    WHERE ica.customer_id IS NOT NULL
 SQL;
     }
 }
