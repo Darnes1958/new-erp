@@ -2,18 +2,13 @@
 
 namespace App\Services\Market;
 
-use App\Models\PaymentMethod;
-use Illuminate\Support\Facades\Cache;
-
 class SalesInvoicesReportService
 {
     public static function installmentPaymentMethodId(): ?int
     {
-        return Cache::remember(
-            'payment_method_installment_id',
-            now()->addHour(),
-            fn (): ?int => PaymentMethod::query()->where('code', 'installment')->value('id'),
-        );
+        $id = (int) config('erp.payment_method_codes.installment');
+
+        return $id > 0 ? $id : null;
     }
 
     /**

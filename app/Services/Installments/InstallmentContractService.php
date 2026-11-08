@@ -13,6 +13,7 @@ use App\Models\SalesInvoice;
 use App\Services\SystemOperationLogger;
 use App\Support\SystemOperationContext;
 use App\Support\SystemOperationType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -34,13 +35,7 @@ class InstallmentContractService
 
     public static function eligibleSalesInvoicesQuery()
     {
-        $installmentPaymentId = (int) config('erp.payment_method_codes.installment');
-
-        return SalesInvoice::query()
-            ->where('payment_method_id', $installmentPaymentId)
-            ->whereDoesntHave('installmentContract')
-            ->whereDoesntHave('installmentContractArchive')
-            ->with('customer');
+        return static::constrainEligibleSalesInvoices(SalesInvoice::query());
     }
 
     public static function eligibleMergeSalesInvoicesQuery()
@@ -53,17 +48,83 @@ class InstallmentContractService
 
     public static function eligibleSalesInvoicesQueryForEdit(int $currentInvoiceId)
     {
-        $installmentPaymentId = (int) config('erp.payment_method_codes.installment');
+        return static::constrainEligibleSalesInvoices(SalesInvoice::query(), $currentInvoiceId);
+    }
 
-        return SalesInvoice::query()
-            ->where('payment_method_id', $installmentPaymentId)
-            ->where(function ($query) use ($currentInvoiceId): void {
-                $query->where(function ($eligible): void {
+    public static function constrainEligibleSalesInvoices(Builder $query, ?int $keepInvoiceId = null): Builder
+    {
+        $query
+            ->where('payment_method_id', (int) config('erp.payment_method_codes.installment'))
+            ->with('customer')
+            ->reorder()
+            ->orderByDesc($query->getModel()->getQualifiedKeyName());
+
+        if ($keepInvoiceId) {
+            $query->where(function (Builder $inner) use ($keepInvoiceId): void {
+                $inner->where(function (Builder $eligible): void {
                     $eligible->whereDoesntHave('installmentContract')
                         ->whereDoesntHave('installmentContractArchive');
-                })->orWhere('id', $currentInvoiceId);
-            })
-            ->with('customer');
+                })->orWhere($inner->getModel()->getQualifiedKeyName(), $keepInvoiceId);
+            });
+        } else {
+            $query
+                ->whereDoesntHave('installmentContract')
+                ->whereDoesntHave('installmentContractArchive');
+        }
+
+        return $query;
+    }
+
+    public static function invoiceOptionLabel(SalesInvoice $record, bool $useBalance = false): string
+    {
+        $amount = $useBalance ? (float) $record->balance : (float) $record->grand_total;
+
+        return sprintf(
+            '%s %s %s',
+            (string) $record->id,
+            (string) ($record->customer?->name ?? ''),
+            number_format($amount, 3, '.', ','),
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function searchEligibleInvoiceOptions(
+        ?string $search,
+        ?int $keepInvoiceId = null,
+        bool $mergeOnly = false,
+    ): array {
+        $query = $keepInvoiceId
+            ? static::constrainEligibleSalesInvoices(SalesInvoice::query(), $keepInvoiceId)
+            : static::eligibleSalesInvoicesQuery();
+
+        if ($mergeOnly) {
+            $query->whereIn(
+                'customer_id',
+                InstallmentContract::query()->distinct()->pluck('customer_id'),
+            );
+        }
+
+        if (filled($search)) {
+            $term = '%'.trim($search).'%';
+
+            $query->where(function (Builder $inner) use ($term): void {
+                $inner->where($inner->getModel()->getQualifiedKeyName(), 'like', $term)
+                    ->orWhereHas(
+                        'customer',
+                        fn (Builder $customer): Builder => $customer->where('name', 'like', $term),
+                    );
+            });
+        }
+
+        return $query
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(fn (SalesInvoice $invoice): array => [
+                $invoice->id => static::invoiceOptionLabel($invoice, useBalance: $mergeOnly),
+            ])
+            ->all();
     }
 
     public function create(array $data): InstallmentContract

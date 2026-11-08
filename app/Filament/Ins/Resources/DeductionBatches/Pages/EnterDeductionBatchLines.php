@@ -33,6 +33,7 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\IconSize;
 use Filament\Support\Enums\TextSize;
+use Filament\Support\Enums\Width;
 use App\Support\Filament\TableSummaries;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -131,14 +132,25 @@ class EnterDeductionBatchLines extends Page implements HasSchemas, HasTable
                             ->visible(fn (): bool => $this->batch->isOpen())
                             ->schema([
                                 \Filament\Schemas\Components\Actions::make([
-                                    Action::make('postBatch')
+                                    Action::make('confirmPostBatch')
                                         ->label('ترحيل')
                                         ->icon('heroicon-o-arrow-up-tray')
                                         ->color('success')
                                         ->requiresConfirmation()
-                                        ->modalHeading('ترحيل الحافظة')
-                                        ->modalDescription('سيتم خصم جميع الأقساط وتأثيرها على العقود. هل تريد المتابعة؟')
-                                        ->action('postBatch'),
+                                        ->modalWidth(Width::Large)
+                                        ->modalIcon('heroicon-o-exclamation-triangle')
+                                        ->modalIconColor('warning')
+                                        ->modalHeading('تأكيد ترحيل الحافظة')
+                                        ->modalContent(fn (): View => view('filament.ins.modals.post-deduction-batch-warning', [
+                                            'batch' => $this->batch,
+                                            'linesCount' => $this->batch->lines()->count(),
+                                        ]))
+                                        ->modalSubmitActionLabel('تأكيد الترحيل')
+                                        ->modalCancelActionLabel('إلغاء')
+                                        ->closeModalByClickingAway(false)
+                                        ->action(function (): void {
+                                            $this->postBatch(app(DeductionBatchService::class));
+                                        }),
                                 ]),
                             ]),
                         Radio::make('deduction_type_id')

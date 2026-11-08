@@ -202,6 +202,53 @@ class DeductionBatchService
         ]);
     }
 
+    /**
+     * Converted batches may store archive entry_type while the contract is still active.
+     *
+     * @return array{0: InstallmentContract|InstallmentContractArchive|InstallmentCancelledContract, 1: DeductionBatchEntryType}
+     */
+    protected function locateContractForPost(DeductionBatch $batch, DeductionBatchLine $line): array
+    {
+        $loaded = $line->contractable;
+
+        if ($loaded instanceof InstallmentContract) {
+            return [$loaded, DeductionBatchEntryType::Active];
+        }
+
+        if ($loaded instanceof InstallmentContractArchive) {
+            return [$loaded, DeductionBatchEntryType::Archive];
+        }
+
+        if ($loaded instanceof InstallmentCancelledContract) {
+            return [$loaded, DeductionBatchEntryType::Cancelled];
+        }
+
+        $connection = $batch->getConnectionName();
+        $contractId = (int) $line->contractable_id;
+
+        $active = InstallmentContract::on($connection)->find($contractId);
+
+        if ($active) {
+            return [$active, DeductionBatchEntryType::Active];
+        }
+
+        $archive = InstallmentContractArchive::on($connection)->find($contractId);
+
+        if ($archive) {
+            return [$archive, DeductionBatchEntryType::Archive];
+        }
+
+        $cancelled = InstallmentCancelledContract::on($connection)->find($contractId);
+
+        if ($cancelled) {
+            return [$cancelled, DeductionBatchEntryType::Cancelled];
+        }
+
+        throw ValidationException::withMessages([
+            'batch' => 'العقد رقم '.$contractId.' غير موجود في العقود القائمة أو الأرشيف أو الملغاة.',
+        ]);
+    }
+
     public function addLine(
         DeductionBatch $batch,
         Model $contract,
@@ -371,21 +418,15 @@ class DeductionBatchService
                     continue;
                 }
 
-                $contract = $line->contractable;
+                [$contract, $entryType] = $this->locateContractForPost($batch, $line);
 
-                if ($line->entry_type === DeductionBatchEntryType::Active) {
-                    if (! $contract instanceof InstallmentContract) {
-                        throw ValidationException::withMessages([
-                            'batch' => 'العقد رقم '.$line->contractable_id.' غير موجود في العقود القائمة.',
-                        ]);
-                    }
-                } elseif ($line->entry_type === DeductionBatchEntryType::Cancelled) {
-                    if (! $contract instanceof InstallmentCancelledContract) {
-                        throw ValidationException::withMessages([
-                            'batch' => 'العقد رقم '.$line->contractable_id.' غير موجود في العقود الملغية.',
-                        ]);
-                    }
+                $line->forceFill([
+                    'contractable_type' => $contract->getMorphClass(),
+                    'contractable_id' => $contract->getKey(),
+                    'entry_type' => $entryType,
+                ])->saveQuietly();
 
+                if ($entryType === DeductionBatchEntryType::Cancelled) {
                     $result = $this->cancelledContractService->recordDeduction(
                         $contract,
                         $line->deduction_date,
@@ -399,9 +440,14 @@ class DeductionBatchService
                     $stats['posted_cancelled_amount'] += (float) $line->amount;
 
                     continue;
-                } elseif (! $contract instanceof InstallmentContractArchive) {
+                }
+
+                if (
+                    ! $contract instanceof InstallmentContract
+                    && ! $contract instanceof InstallmentContractArchive
+                ) {
                     throw ValidationException::withMessages([
-                        'batch' => 'العقد رقم '.$line->contractable_id.' غير موجود في الأرشيف.',
+                        'batch' => 'العقد رقم '.$line->contractable_id.' غير صالح للترحيل.',
                     ]);
                 }
 

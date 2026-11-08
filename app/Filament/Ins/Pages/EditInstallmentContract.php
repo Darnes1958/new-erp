@@ -103,16 +103,15 @@ class EditInstallmentContract extends Page implements HasSchemas
                                     ->relationship(
                                         name: 'salesInvoice',
                                         titleAttribute: 'id',
-                                        modifyQueryUsing: fn (Builder $query) => InstallmentContractService::eligibleSalesInvoicesQueryForEdit($currentInvoiceId),
+                                        modifyQueryUsing: fn (Builder $query) => InstallmentContractService::constrainEligibleSalesInvoices($query, $currentInvoiceId),
+                                    )
+                                    ->getSearchResultsUsing(
+                                        fn (?string $search): array => InstallmentContractService::searchEligibleInvoiceOptions($search, $currentInvoiceId),
                                     )
                                     ->getOptionLabelFromRecordUsing(
-                                        fn (SalesInvoice $record): string => sprintf(
-                                            '%s %s %s',
-                                            (string) $record->id,
-                                            (string) ($record->customer?->name ?? ''),
-                                            number_format((float) $record->grand_total, 3, '.', ','),
-                                        ),
+                                        fn (SalesInvoice $record): string => InstallmentContractService::invoiceOptionLabel($record),
                                     )
+                                    ->optionsLimit(50)
                                     ->columnSpan(2)
                                     ->afterStateUpdated(function (?int $state, Set $set): void {
                                         if (! $state) {

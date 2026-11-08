@@ -93,14 +93,13 @@ class MergeInstallmentContract extends Page implements HasSchemas
                                         titleAttribute: 'id',
                                         modifyQueryUsing: fn (Builder $query) => InstallmentContractService::eligibleMergeSalesInvoicesQuery(),
                                     )
-                                    ->getOptionLabelFromRecordUsing(
-                                        fn (SalesInvoice $record): string => sprintf(
-                                            '%s %s %s',
-                                            (string) $record->id,
-                                            (string) ($record->customer?->name ?? ''),
-                                            number_format((float) $record->balance, 3, '.', ','),
-                                        ),
+                                    ->getSearchResultsUsing(
+                                        fn (?string $search): array => InstallmentContractService::searchEligibleInvoiceOptions($search, mergeOnly: true),
                                     )
+                                    ->getOptionLabelFromRecordUsing(
+                                        fn (SalesInvoice $record): string => InstallmentContractService::invoiceOptionLabel($record, useBalance: true),
+                                    )
+                                    ->optionsLimit(50)
                                     ->suffixAction(
                                         Action::make('newInstallmentInvoice')
                                             ->icon('heroicon-m-plus')

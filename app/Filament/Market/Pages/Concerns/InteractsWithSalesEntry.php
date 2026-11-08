@@ -47,7 +47,7 @@ trait InteractsWithSalesEntry
     {
         $paymentMethodId = (int) ($this->headerData['payment_method_id'] ?? $this->work->payment_method_id ?? 1);
 
-        return $paymentMethodId === 3;
+        return $paymentMethodId === (int) config('erp.payment_method_codes.installment');
     }
 
     public function headerForm(Schema $schema): Schema
@@ -94,7 +94,7 @@ trait InteractsWithSalesEntry
             $entryPaid = (float) ($state['amount_paid'] ?? 0);
             $paymentMethodId = (int) ($state['payment_method_id'] ?? $this->work->payment_method_id ?? 1);
 
-            $differenceAmount = $paymentMethodId === 3
+            $differenceAmount = $paymentMethodId === (int) config('erp.payment_method_codes.installment')
                 ? ($subtotal + $extraCost) * $rateMarkup / 100
                 : 0;
 

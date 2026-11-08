@@ -99,16 +99,15 @@ class CreateInstallmentContract extends Page implements HasSchemas
                                     ->relationship(
                                         name: 'salesInvoice',
                                         titleAttribute: 'id',
-                                        modifyQueryUsing: fn (Builder $query) => InstallmentContractService::eligibleSalesInvoicesQuery(),
+                                        modifyQueryUsing: fn (Builder $query) => InstallmentContractService::constrainEligibleSalesInvoices($query),
+                                    )
+                                    ->getSearchResultsUsing(
+                                        fn (?string $search): array => InstallmentContractService::searchEligibleInvoiceOptions($search),
                                     )
                                     ->getOptionLabelFromRecordUsing(
-                                        fn (SalesInvoice $record): string => sprintf(
-                                            '%s %s %s',
-                                            (string) $record->id,
-                                            (string) ($record->customer?->name ?? ''),
-                                            number_format((float) $record->grand_total, 3, '.', ','),
-                                        ),
+                                        fn (SalesInvoice $record): string => InstallmentContractService::invoiceOptionLabel($record),
                                     )
+                                    ->optionsLimit(50)
                                     ->suffixAction(
                                         Action::make('newInstallmentInvoice')
                                             ->icon('heroicon-m-plus')

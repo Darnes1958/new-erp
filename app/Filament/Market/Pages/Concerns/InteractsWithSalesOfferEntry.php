@@ -37,7 +37,7 @@ trait InteractsWithSalesOfferEntry
     {
         $paymentMethodId = (int) ($this->headerData['payment_method_id'] ?? $this->work->payment_method_id ?? 1);
 
-        return $paymentMethodId === 3;
+        return $paymentMethodId === (int) config('erp.payment_method_codes.installment');
     }
 
     public function canEditSellPrice(): bool
@@ -74,7 +74,7 @@ trait InteractsWithSalesOfferEntry
         $rateMarkup = (float) ($state['rate_markup'] ?? 0);
         $paymentMethodId = (int) ($state['payment_method_id'] ?? $this->work->payment_method_id ?? 1);
 
-        $differenceAmount = $paymentMethodId === 3
+        $differenceAmount = $paymentMethodId === (int) config('erp.payment_method_codes.installment')
             ? ($subtotal + $extraCost) * $rateMarkup / 100
             : 0;
 

@@ -4,6 +4,7 @@ namespace App\Services\Conversion;
 
 use App\Services\Conversion\Concerns\ConvertsSqlServerCompanyData;
 use App\Services\Conversion\Concerns\MapsLegacyEmpToUserId;
+use App\Support\Conversion\InsPaymentMethodMap;
 use App\Support\Conversion\LegacyConnectionNaming;
 use App\Support\Conversion\LegacySchemaDetector;
 use App\Support\Conversion\LegacySchemaKind;
@@ -292,18 +293,26 @@ class InsCompanyDataConverter
 
     protected function convertPaymentMethods(): void
     {
-        if (! $this->legacyHasTable('price_type')) {
-            $this->log('Skipped payment_methods: table [price_type] not found.');
-
-            return;
-        }
-
-        $legacyByType = $this->legacyTableOrdered('price_type', 'type_no')->keyBy(fn ($row) => (int) $row->type_no);
+        $legacyByType = $this->legacyHasTable('price_type')
+            ? $this->legacyTableOrdered('price_type', 'type_no')->keyBy(fn ($row) => (int) $row->type_no)
+            : collect();
 
         $erpSlots = [
-            1 => ['legacy_type' => 1, 'code' => 'cash'],
-            2 => ['legacy_type' => 3, 'code' => 'bank'],        // INS صك → ERP bank
-            3 => ['legacy_type' => 2, 'code' => 'installment'], // INS تقسيط → ERP installment
+            InsPaymentMethodMap::ERP_CASH => [
+                'legacy_type' => InsPaymentMethodMap::INS_CASH,
+                'code' => 'cash',
+                'fallback_name' => 'نقدي',
+            ],
+            InsPaymentMethodMap::ERP_BANK => [
+                'legacy_type' => InsPaymentMethodMap::INS_CHEQUE,
+                'code' => 'bank',
+                'fallback_name' => 'مصرفي',
+            ],
+            InsPaymentMethodMap::ERP_INSTALLMENT => [
+                'legacy_type' => InsPaymentMethodMap::INS_INSTALLMENT,
+                'code' => 'installment',
+                'fallback_name' => 'تقسيط',
+            ],
         ];
 
         $rows = [];
@@ -311,41 +320,26 @@ class InsCompanyDataConverter
         foreach ($erpSlots as $erpId => $slot) {
             $legacy = $legacyByType->get($slot['legacy_type']);
 
-            if ($legacy === null) {
-                continue;
-            }
-
             $rows[] = [
                 'id' => $erpId,
-                'name' => $this->stringOrNull($legacy->type_name ?? null) ?? "type_{$erpId}",
+                'name' => $this->stringOrNull($legacy?->type_name ?? null) ?? $slot['fallback_name'],
                 'code' => $slot['code'],
-                'rate' => $legacy->rate ?? 0,
-                'adjustment_value' => $legacy->val ?? 0,
-                'adjustment_direction' => (int) ($legacy->inc_dec ?? 0),
+                'rate' => $legacy?->rate ?? 0,
+                'adjustment_value' => $legacy?->val ?? 0,
+                'adjustment_direction' => (int) ($legacy?->inc_dec ?? 0),
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
         }
 
-        if ($rows === []) {
-            return;
-        }
-
         $this->insertWithIdentity('payment_methods', $rows);
-        $this->log('Converted '.count($rows).' payment method(s).');
+        $this->log('Converted payment methods with fixed ERP ids: 1=نقدي, 2=مصرفي/صك, 3=تقسيط (INS 2↔3 swapped).');
     }
 
-    /**
-     * INS price_type 2 = installment, 3 = check — ERP uses 3 = installment, 2 = bank.
-     */
     protected function mapInsPaymentMethodId(mixed $insTypeNo): int
     {
-        return match ((int) $insTypeNo) {
-            2 => 3,
-            3 => 2,
-            default => (int) $insTypeNo,
-        };
+        return InsPaymentMethodMap::toErp($insTypeNo);
     }
 
     protected function convertMasterData(): void
