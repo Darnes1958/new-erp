@@ -2,6 +2,7 @@
 
 namespace App\Services\Market;
 
+use App\Database\Views\CustomerLedgerEntriesView;
 use App\Enums\ReceiptTransactionKind;
 use App\Models\Customer;
 use App\Models\CustomerLedgerEntry;
@@ -32,10 +33,13 @@ class CustomerLedgerReportService
             return ['debit' => 0, 'credit' => 0, 'balance' => 0];
         }
 
-        $row = CustomerLedgerEntry::query()
-            ->where('customer_id', $customerId)
-            ->selectRaw('COALESCE(SUM(mden), 0) AS debit, COALESCE(SUM(daen), 0) AS credit')
-            ->first();
+        [$sql, $bindings] = $this->scopedLinesSql();
+        $customerBindings = array_fill(0, $bindings, $customerId);
+
+        $row = DB::connection($this->connectionName())->selectOne(
+            "SELECT COALESCE(SUM(mden), 0) AS debit, COALESCE(SUM(daen), 0) AS credit FROM ({$sql}) AS lines",
+            $customerBindings,
+        );
 
         $debit = (float) ($row->debit ?? 0);
         $credit = (float) ($row->credit ?? 0);
@@ -56,11 +60,15 @@ class CustomerLedgerReportService
             return ['debit' => 0, 'credit' => 0, 'balance' => 0];
         }
 
-        $row = CustomerLedgerEntry::query()
-            ->where('customer_id', $customerId)
-            ->whereDate('rep_date', '>=', $dateFrom)
-            ->selectRaw('COALESCE(SUM(mden), 0) AS debit, COALESCE(SUM(daen), 0) AS credit')
-            ->first();
+        [$sql, $bindings] = $this->scopedLinesSql();
+        $customerBindings = array_fill(0, $bindings, $customerId);
+
+        $row = DB::connection($this->connectionName())->selectOne(
+            "SELECT COALESCE(SUM(mden), 0) AS debit, COALESCE(SUM(daen), 0) AS credit
+             FROM ({$sql}) AS lines
+             WHERE CAST(lines.rep_date AS date) >= ?",
+            [...$customerBindings, $dateFrom],
+        );
 
         $debit = (float) ($row->debit ?? 0);
         $credit = (float) ($row->credit ?? 0);
@@ -78,32 +86,86 @@ class CustomerLedgerReportService
             return 0;
         }
 
-        return (float) CustomerLedgerEntry::query()
-            ->where('customer_id', $customerId)
-            ->whereDate('rep_date', '<', $dateFrom)
-            ->selectRaw('COALESCE(SUM(COALESCE(mden, 0) - COALESCE(daen, 0)), 0) AS balance')
-            ->value('balance');
+        [$sql, $bindings] = $this->scopedLinesSql();
+        $customerBindings = array_fill(0, $bindings, $customerId);
+
+        $row = DB::connection($this->connectionName())->selectOne(
+            "SELECT COALESCE(SUM(COALESCE(mden, 0) - COALESCE(daen, 0)), 0) AS balance
+             FROM ({$sql}) AS lines
+             WHERE CAST(lines.rep_date AS date) < ?",
+            [...$customerBindings, $dateFrom],
+        );
+
+        return (float) ($row->balance ?? 0);
     }
 
     public function movementQuery(?int $customerId, ?string $dateFrom): Builder
     {
+        if (! filled($customerId)) {
+            return CustomerLedgerEntry::query()->whereRaw('1 = 0');
+        }
+
+        [$linesSql, $bindingCount] = $this->scopedLinesSql();
+        $customerBindings = array_fill(0, $bindingCount, $customerId);
+
+        if (filled($dateFrom)) {
+            $openingSql = <<<SQL
+COALESCE((
+    SELECT SUM(COALESCE(opening.mden, 0) - COALESCE(opening.daen, 0))
+    FROM ({$linesSql}) AS opening
+    WHERE CAST(opening.rep_date AS date) < ?
+), 0)
+SQL;
+            $datePredicate = 'WHERE CAST(numbered.rep_date AS date) >= ?';
+            // Placeholder order in SQL: opening lines → opening date → movement lines → period date
+            $bindings = [...$customerBindings, $dateFrom, ...$customerBindings, $dateFrom];
+        } else {
+            $openingSql = 'CAST(0 AS decimal(18, 3))';
+            $datePredicate = '';
+            $bindings = $customerBindings;
+        }
+
+        $sql = <<<SQL
+(
+    SELECT
+        numbered.customer_id,
+        numbered.customer_name,
+        numbered.rep_date,
+        numbered.id,
+        numbered.idd,
+        numbered.transaction_kind,
+        numbered.payment_method_name,
+        numbered.mden,
+        numbered.daen,
+        numbered.notes,
+        {$openingSql}
+            + SUM(COALESCE(numbered.mden, 0) - COALESCE(numbered.daen, 0)) OVER (
+                ORDER BY numbered.rep_date, numbered.idd
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS running_balance
+    FROM (
+        SELECT
+            lines.customer_id,
+            lines.customer_name,
+            lines.rep_date,
+            lines.source_id AS id,
+            ROW_NUMBER() OVER (
+                ORDER BY lines.rep_date, lines.source_order, lines.sort_id
+            ) AS idd,
+            lines.transaction_kind,
+            lines.payment_method_name,
+            lines.mden,
+            lines.daen,
+            lines.notes
+        FROM ({$linesSql}) AS lines
+    ) AS numbered
+    {$datePredicate}
+) AS customer_ledger_entries
+SQL;
+
         return CustomerLedgerEntry::query()
+            ->fromRaw($sql, $bindings)
             ->select('customer_ledger_entries.*')
-            ->selectRaw(
-                'COALESCE((
-                    SELECT SUM(COALESCE(opening.mden, 0) - COALESCE(opening.daen, 0))
-                    FROM customer_ledger_entries AS opening
-                    WHERE opening.customer_id = ?
-                      AND opening.rep_date < ?
-                ), 0) + SUM(COALESCE(customer_ledger_entries.mden, 0) - COALESCE(customer_ledger_entries.daen, 0))
-                    OVER (
-                        ORDER BY customer_ledger_entries.rep_date, customer_ledger_entries.idd
-                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                    ) AS running_balance',
-                [$customerId, $dateFrom],
-            )
-            ->when(filled($customerId), fn (Builder $query): Builder => $query->where('customer_id', $customerId))
-            ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('rep_date', '>=', $dateFrom))
             ->orderBy('customer_ledger_entries.rep_date')
             ->orderBy('customer_ledger_entries.idd');
     }
@@ -158,5 +220,23 @@ class CustomerLedgerReportService
 
             return $row;
         });
+    }
+
+    /**
+     * @return array{0: string, 1: int}
+     */
+    protected function scopedLinesSql(): array
+    {
+        return (new CustomerLedgerEntriesView)->unionLinesSqlWithBindings(
+            $this->connectionName(),
+            includeReturnedAmountInSalesInvoice: true,
+            bindCustomer: true,
+        );
+    }
+
+    protected function connectionName(): string
+    {
+        return (new CustomerLedgerEntry)->getConnectionName()
+            ?? config('database.default');
     }
 }
