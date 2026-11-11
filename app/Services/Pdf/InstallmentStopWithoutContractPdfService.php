@@ -23,6 +23,7 @@ class InstallmentStopWithoutContractPdfService
             'company' => $company ?? OurCompany::forCurrentUser(),
             'payrollBank' => $payrollBank,
             'reportDate' => now()->toDateString(),
+            'letterHeader' => true,
             'rows' => $rows->sortBy([
                 ['id', 'asc'],
             ])->values(),
@@ -42,6 +43,7 @@ class InstallmentStopWithoutContractPdfService
             'record' => $record,
             'payrollBank' => $payrollBank,
             'reportDate' => now()->toDateString(),
+            'letterHeader' => true,
         ])
             ->name('stop-without-contract-'.$record->id.'.pdf');
     }

@@ -2,6 +2,7 @@
 
 namespace App\Services\Installments;
 
+use App\Models\InstallmentBank;
 use App\Models\InstallmentContract;
 use App\Models\InstallmentStop;
 use Carbon\Carbon;
@@ -12,12 +13,27 @@ use Illuminate\Validation\ValidationException;
 
 class InstallmentStopService
 {
-    public function eligibleContractsQuery(): Builder
+    public function eligibleContractsQuery(?int $payrollBankId = null): Builder
     {
-        return InstallmentContract::query()
-            ->with('customer')
+        $query = InstallmentContract::query()
+            ->with(['customer', 'payrollBank', 'installmentBank'])
             ->where('balance', '<=', 0)
             ->whereNotIn('id', InstallmentStop::query()->select('installment_contract_id'));
+
+        if ($payrollBankId) {
+            return $query->where(function (Builder $bankQuery) use ($payrollBankId): void {
+                $bankQuery
+                    ->where('payroll_bank_id', $payrollBankId)
+                    ->orWhereIn(
+                        'installment_bank_id',
+                        InstallmentBank::query()
+                            ->where('payroll_bank_id', $payrollBankId)
+                            ->select('id'),
+                    );
+            });
+        }
+
+        return $query;
     }
 
     public function eligibleCount(): int

@@ -3,7 +3,6 @@
 namespace App\Filament\Ins\Pages;
 
 use App\Filament\Ins\Support\InstallmentListPrintActions;
-use App\Models\InstallmentBank;
 use App\Models\InstallmentContract;
 use App\Models\PayrollBank;
 use App\Services\Excel\InstallmentExcelService;
@@ -17,7 +16,6 @@ use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -61,10 +59,6 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
     #[Url(as: 'tab')]
     public string $activeTab = 'register';
 
-    public int $filterBy = 2;
-
-    public ?int $installmentBankId = null;
-
     public ?int $payrollBankId = null;
 
     public ?string $dateFrom = null;
@@ -98,8 +92,6 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
         $this->dateTo = now()->toDateString();
 
         $this->reportForm->fill([
-            'filterBy' => $this->filterBy,
-            'installmentBankId' => $this->installmentBankId,
             'payrollBankId' => $this->payrollBankId,
             'dateFrom' => $this->dateFrom,
             'dateTo' => $this->dateTo,
@@ -133,41 +125,36 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
         return $schema
             ->components([
                 Group::make([
-                    Radio::make('filterBy')
-                        ->hiddenLabel()
-                        ->inlineLabel()
-                        ->inline()
-                        ->live()
-                        ->options([
-                            2 => 'بالتجميعي',
-                            1 => 'بفروع المصارف',
-                        ]),
-                ]),
-                Group::make([
-                    Select::make('installmentBankId')
-                        ->columnSpan(2)
-                        ->inlineLabel()
-                        ->label('فرع المصرف')
-                        ->options(fn (): array => InstallmentBank::query()->orderBy('name')->pluck('name', 'id')->all())
-                        ->searchable()
-                        ->live()
-                        ->visible(fn (): bool => $this->filterBy === 1),
                     Select::make('payrollBankId')
                         ->columnSpan(2)
                         ->inlineLabel()
                         ->label('المصرف التجميعي')
+                        ->placeholder('الكل')
                         ->options(fn (): array => PayrollBank::query()->orderBy('name')->pluck('name', 'id')->all())
                         ->searchable()
                         ->live()
-                        ->visible(fn (): bool => $this->filterBy === 2),
+                        ->afterStateUpdated(function ($state): void {
+                            $this->payrollBankId = $state ? (int) $state : null;
+                            $this->resetTable();
+                        }),
                     DatePicker::make('dateFrom')
                         ->inlineLabel()
                         ->label('من')
-                        ->live(),
+                        ->live()
+                        ->visible(fn (): bool => $this->activeTab === 'report')
+                        ->afterStateUpdated(function ($state): void {
+                            $this->dateFrom = $state;
+                            $this->resetTable();
+                        }),
                     DatePicker::make('dateTo')
                         ->inlineLabel()
                         ->label('إلي')
-                        ->live(),
+                        ->live()
+                        ->visible(fn (): bool => $this->activeTab === 'report')
+                        ->afterStateUpdated(function ($state): void {
+                            $this->dateTo = $state;
+                            $this->resetTable();
+                        }),
                 ])->columns(5),
             ]);
     }
@@ -184,7 +171,9 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
     protected function configureRegisterTable(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => app(InstallmentStopService::class)->eligibleContractsQuery())
+            ->query(fn (): Builder => app(InstallmentStopService::class)->eligibleContractsQuery(
+                $this->payrollBankId,
+            ))
             ->description('حدّد العقود المراد إيقافها عبر مربعات الاختيار على يمين الجدول، ثم اختر «إيقاف» من شريط الأدوات.')
             ->emptyStateHeading('لا توجد عقود منتهية لإيقافها')
             ->columns([
@@ -199,6 +188,11 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
                     ->label('رقم الحساب')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('bank_name')
+                    ->label('المصرف')
+                    ->getStateUsing(fn (InstallmentContract $record): string => $record->payrollBank?->name
+                        ?? $record->installmentBank?->name
+                        ?? '—'),
                 TextColumn::make('balance')
                     ->label('الرصيد')
                     ->numeric(3),
@@ -235,9 +229,11 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
     {
         return $table
             ->query(fn (): Builder => app(InstallmentStopReportService::class)->stoppedContractsQuery(
-                $this->filterBy,
-                $this->installmentBankId,
+                2,
+                null,
                 $this->payrollBankId,
+                $this->dateFrom,
+                $this->dateTo,
             ))
             ->columns([
                 TextColumn::make('id')
@@ -249,9 +245,11 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
                             ->label('العدد')
                             ->using(function (): int {
                                 $summary = app(InstallmentStopReportService::class)->bankSummary(
-                                    $this->filterBy,
-                                    $this->installmentBankId,
+                                    2,
+                                    null,
                                     $this->payrollBankId,
+                                    $this->dateFrom,
+                                    $this->dateTo,
                                 );
 
                                 return $summary['count'];
@@ -266,9 +264,11 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
                         Summarizer::make()
                             ->using(function (): string {
                                 $summary = app(InstallmentStopReportService::class)->bankSummary(
-                                    $this->filterBy,
-                                    $this->installmentBankId,
+                                    2,
+                                    null,
                                     $this->payrollBankId,
+                                    $this->dateFrom,
+                                    $this->dateTo,
                                 );
 
                                 return number_format($summary['contract_total'], 3, '.', ',');
@@ -325,8 +325,8 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
     {
         $service = app(InstallmentStopReportService::class);
         $payrollBank = $service->resolvePayrollBank(
-            $this->filterBy,
-            $this->installmentBankId,
+            2,
+            null,
             $this->payrollBankId,
         );
 
@@ -340,9 +340,11 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
         }
 
         $rows = $service->stoppedContractsQuery(
-            $this->filterBy,
-            $this->installmentBankId,
+            2,
+            null,
             $this->payrollBankId,
+            $this->dateFrom,
+            $this->dateTo,
         )->get();
 
         if ($rows->isEmpty()) {
@@ -363,8 +365,8 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
     {
         $service = app(InstallmentStopReportService::class);
         $payrollBank = $service->resolvePayrollBank(
-            $this->filterBy,
-            $this->installmentBankId,
+            2,
+            null,
             $this->payrollBankId,
         );
 
@@ -378,9 +380,11 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
         }
 
         $rows = $service->stoppedContractsQuery(
-            $this->filterBy,
-            $this->installmentBankId,
+            2,
+            null,
             $this->payrollBankId,
+            $this->dateFrom,
+            $this->dateTo,
         )->get();
 
         if ($rows->isEmpty()) {
@@ -394,7 +398,7 @@ class RecordInstallmentStop extends Page implements HasActions, HasForms, HasTab
 
         return app(InstallmentExcelService::class)->installmentStopReport(
             $rows,
-            $service->filterLines($payrollBank),
+            $service->filterLines($payrollBank, $this->dateFrom, $this->dateTo),
         );
     }
 

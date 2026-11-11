@@ -71,6 +71,6 @@ return new class extends Migration
         DB::connection($connection)->statement('IF OBJECT_ID(N\'cash_box_ledger_entries\', N\'V\') IS NOT NULL DROP VIEW cash_box_ledger_entries');
         DB::connection($connection)->statement('IF OBJECT_ID(N\'bank_account_ledger_entries\', N\'V\') IS NOT NULL DROP VIEW bank_account_ledger_entries');
         DB::connection($connection)->statement($views->cashBoxSql());
-        DB::connection($connection)->statement($views->bankAccountSql());
+        DB::connection($connection)->statement($views->bankAccountSql($connection));
     }
 };

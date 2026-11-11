@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
 class BankAccount extends CompanyModel
 {
     protected $fillable = [
@@ -16,5 +18,10 @@ class BankAccount extends CompanyModel
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    public function payrollBanks(): HasMany
+    {
+        return $this->hasMany(PayrollBank::class);
     }
 }

@@ -10,6 +10,7 @@ use App\Models\BankAccount;
 use App\Models\CustomerReceipt;
 use App\Models\Expense;
 use App\Models\FundTransfer;
+use App\Models\PayrollBank;
 use App\Models\SalaryTransaction;
 use App\Models\SupplierPayment;
 use Filament\Actions\DeleteAction;
@@ -106,7 +107,8 @@ class BankAccountResource extends Resource
                         || SupplierPayment::query()->where('bank_account_id', $record->id)->exists()
                         || Expense::query()->where('bank_account_id', $record->id)->exists()
                         || SalaryTransaction::query()->where('bank_account_id', $record->id)->exists()
-                        || FundTransfer::query()->where('from_bank_account_id', $record->id)->orWhere('to_bank_account_id', $record->id)->exists()),
+                        || FundTransfer::query()->where('from_bank_account_id', $record->id)->orWhere('to_bank_account_id', $record->id)->exists()
+                        || PayrollBank::query()->where('bank_account_id', $record->id)->exists()),
             ]);
     }
 

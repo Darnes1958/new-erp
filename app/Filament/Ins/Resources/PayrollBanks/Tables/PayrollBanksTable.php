@@ -31,6 +31,11 @@ class PayrollBanksTable
                     ->label('المصرف الأم')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('bankAccount.name')
+                    ->label('الحساب المصرفي')
+                    ->placeholder('—')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('installment_banks_count')
                     ->label('عدد الفروع')
                     ->counts('installmentBanks')

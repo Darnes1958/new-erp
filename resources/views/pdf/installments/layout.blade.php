@@ -34,14 +34,44 @@
             border: 1pt solid lightgray;
             padding: 2px 6px;
         }
+
+        .letter-frame {
+            border: 1.8pt solid #5a8a9a;
+            padding: 12px 16px 18px;
+            min-height: 255mm;
+            box-sizing: border-box;
+        }
+
+        .letter-rule {
+            border: none;
+            border-top: 1.6pt solid #5a8a9a;
+            border-bottom: 0.5pt solid #5a8a9a;
+            height: 3px;
+            margin: 8px 0 16px;
+        }
     </style>
 </head>
 <body>
-<div>
-    @include('pdf.partials.company-header', ['company' => $company ?? null])
-</div>
-<br>
+@if ($letterHeader ?? false)
+    <div class="letter-frame">
+        <div>
+            @include('pdf.installments.partials.stop-letter-header', [
+                'company' => $company ?? null,
+                'reportDate' => $reportDate ?? null,
+            ])
+        </div>
+        <div class="letter-rule"></div>
+@else
+    <div>
+        @include('pdf.partials.company-header', ['company' => $company ?? null])
+    </div>
+    <br>
+@endif
 
 @yield('content')
+
+@if ($letterHeader ?? false)
+    </div>
+@endif
 </body>
 </html>

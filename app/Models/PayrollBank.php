@@ -11,11 +11,25 @@ class PayrollBank extends CompanyModel
         'name',
         'account_number',
         'bank_main_id',
+        'bank_account_id',
+        'bank_ledger_from',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'bank_ledger_from' => 'date',
+        ];
+    }
 
     public function bankMain(): BelongsTo
     {
         return $this->belongsTo(BankMain::class);
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
     }
 
     public function installmentBanks(): HasMany

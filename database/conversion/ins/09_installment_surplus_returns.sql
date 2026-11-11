@@ -6,8 +6,8 @@
 |   over_kst_a → installment_surplus_archives   (فائض عقود مؤرشفة)
 |   wrong_kst  → wrong_deductions               (خصومات واردة بالخطأ)
 |   tar_kst    → installment_suspended          (ترجيع: من فائض / خطأ / قسط مخصوم)
-|   stop_kst   → installment_stops              (عقد نشط)
-|              → installment_stops_without_contract (عقد مؤرشف أو بدون عقد)
+|   stop_kst   → installment_stops              (عقد نشط أو مؤرشف)
+|              → installment_stops_without_contract (بدون عقد في القائمة أو الأرشيف)
 |
 | tar_type → InstallmentReturnType:
 |   1 = FromSurplus   (من الفائض)
@@ -510,10 +510,48 @@ WHERE EXISTS (
     WHERE st.id = s.rec_no
 );
 
+-- 5b) stop_kst → installment_stops (archived contracts; same contract id space after FK drop)
+INSERT INTO BenTaher_erp.dbo.installment_stops (
+    id,
+    installment_contract_id,
+    stop_date,
+    created_by,
+    created_at,
+    updated_at
+)
+SELECT
+    CAST(s.rec_no AS BIGINT),
+    CAST(ma.id AS BIGINT),
+    s.stop_date,
+    COALESCE(u.id, @FallbackUserId),
+    COALESCE(s.stop_date, GETDATE()),
+    COALESCE(s.stop_date, GETDATE())
+FROM BenTaher.dbo.stop_kst AS s
+INNER JOIN (
+    SELECT no, MIN(id) AS id
+    FROM BenTaher.dbo.MainArc
+    GROUP BY no
+) AS ma ON ma.no = s.no
+INNER JOIN BenTaher_erp.dbo.installment_contract_archives AS ca
+    ON ca.id = ma.id
+LEFT JOIN new_erp.dbo.users AS u
+    ON u.company = @TargetCompany
+    AND u.empno = s.emp
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM BenTaher_erp.dbo.installment_contracts AS c
+    WHERE c.id = s.no
+)
+  AND NOT EXISTS (
+    SELECT 1
+    FROM BenTaher_erp.dbo.installment_stops AS st
+    WHERE st.id = s.rec_no
+);
+
 SET IDENTITY_INSERT BenTaher_erp.dbo.installment_stops OFF;
 
 -- ---------------------------------------------------------------------------
--- 6) stop_kst → installment_stops_without_contract (archived / unmatched)
+-- 6) stop_kst → installment_stops_without_contract (no active/archive contract)
 -- ---------------------------------------------------------------------------
 SET IDENTITY_INSERT BenTaher_erp.dbo.installment_stops_without_contract ON;
 
@@ -546,6 +584,17 @@ WHERE NOT EXISTS (
     FROM BenTaher_erp.dbo.installment_contracts AS c
     WHERE c.id = s.no
 )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+        SELECT no, MIN(id) AS id
+        FROM BenTaher.dbo.MainArc
+        GROUP BY no
+    ) AS ma
+    INNER JOIN BenTaher_erp.dbo.installment_contract_archives AS ca
+        ON ca.id = ma.id
+    WHERE ma.no = s.no
+  )
   AND NOT EXISTS (
     SELECT 1
     FROM BenTaher_erp.dbo.installment_stops_without_contract AS sw

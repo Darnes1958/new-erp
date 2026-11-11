@@ -151,7 +151,7 @@ FROM (
 SQL;
     }
 
-    public function bankAccountSql(): string
+    public function bankAccountSql(?string $connection = null): string
     {
         $mden = $this->customerReceiptMdenSql();
         $daen = $this->customerReceiptDaenSql();
