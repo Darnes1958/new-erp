@@ -30,8 +30,9 @@
             @endif
         </td>
         <td style="width: 32%; border: none; text-align: center; vertical-align: middle; padding: 0;">
-            @if ($company?->logoAbsolutePath())
-                <img src="{{ $company->logoAbsolutePath() }}" alt="" style="max-height: 100px; max-width: 220px;">
+            @php($logoSrc = $company?->logoPdfSrc())
+            @if ($logoSrc)
+                <img src="{{ $logoSrc }}" alt="" style="max-height: 100px; max-width: 220px;">
             @endif
         </td>
         <td style="width: 34%; border: none; text-align: left; vertical-align: top; padding: 8px 0 0 0; font-size: 9pt; font-family: DejaVu Sans, sans-serif; color: #333;">

@@ -50,9 +50,45 @@ class OurCompany extends Model
             return null;
         }
 
-        $path = storage_path('app/public/'.$this->logo_path);
+        $relative = str_replace('\\', '/', ltrim((string) $this->logo_path, '/'));
+        $path = storage_path('app/public/'.$relative);
 
-        return is_file($path) ? $path : null;
+        if (is_file($path)) {
+            return $path;
+        }
+
+        $withoutExtension = (string) preg_replace('/\.(jpe?g|png|gif|webp)$/i', '', $path);
+
+        if ($withoutExtension !== $path && is_file($withoutExtension)) {
+            return $withoutExtension;
+        }
+
+        foreach (['.jpg', '.jpeg', '.png', '.gif', '.webp'] as $extension) {
+            if (is_file($withoutExtension.$extension)) {
+                return $withoutExtension.$extension;
+            }
+        }
+
+        return null;
+    }
+
+    public function logoPdfSrc(): ?string
+    {
+        $path = $this->logoAbsolutePath();
+
+        if ($path === null) {
+            return null;
+        }
+
+        $contents = @file_get_contents($path);
+
+        if ($contents === false || $contents === '') {
+            return null;
+        }
+
+        $mime = @mime_content_type($path) ?: 'image/jpeg';
+
+        return 'data:'.$mime.';base64,'.base64_encode($contents);
     }
 
     /**

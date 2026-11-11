@@ -12,8 +12,9 @@
                 ])
             </td>
             <td style="width: 24%; border: none; vertical-align: top; text-align: center;">
-                @if ($company?->logoAbsolutePath())
-                    <img src="{{ $company->logoAbsolutePath() }}" alt="" style="max-height: 80px; max-width: 160px;">
+                @php($logoSrc = $company?->logoPdfSrc())
+                @if ($logoSrc)
+                    <img src="{{ $logoSrc }}" alt="" style="max-height: 80px; max-width: 160px;">
                 @endif
             </td>
             <td style="width: 38%; border: none; vertical-align: top; text-align: left;">

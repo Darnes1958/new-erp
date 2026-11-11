@@ -1,7 +1,8 @@
 <div>
-    @if (($showLogo ?? true) && $company?->logoAbsolutePath())
+    @php($logoSrc = ($showLogo ?? true) ? $company?->logoPdfSrc() : null)
+    @if ($logoSrc)
         <div style="margin-bottom: 6px;">
-            <img src="{{ $company->logoAbsolutePath() }}" alt="" style="max-height: 70px; max-width: 180px;">
+            <img src="{{ $logoSrc }}" alt="" style="max-height: 70px; max-width: 180px;">
         </div>
     @endif
 
