@@ -49,15 +49,7 @@
         </tr>
         </thead>
         <tbody>
-        @php
-            $qtyPrimaryTotal = 0;
-            $qtySecondaryTotal = 0;
-        @endphp
         @foreach ($invoice->lines as $line)
-            @php
-                $qtyPrimaryTotal += (float) $line->qty_primary;
-                $qtySecondaryTotal += (float) $line->qty_secondary;
-            @endphp
             <tr>
                 <td style="color: #0c63e4; text-align: center;">{{ $line->item_id }}</td>
                 <td style="text-align: right;">{{ $line->item?->name }}</td>
@@ -69,9 +61,9 @@
         @endforeach
         <tr style="font-weight: bold;">
             <td colspan="2" style="text-align: center;">إجمالي الكمية</td>
-            <td style="text-align: center; background: lightgray;">{{ number_format($qtyPrimaryTotal, 0) }}</td>
+            <td style="text-align: center; background: lightgray;">{{ number_format((float) $invoice->lines->sum('qty_primary'), 0) }}</td>
             @if ($hasDualUnit)
-                <td style="text-align: center; background: lightgray;">{{ number_format($qtySecondaryTotal, 0) }}</td>
+                <td style="text-align: center; background: lightgray;">{{ number_format((float) $invoice->lines->sum('qty_secondary'), 0) }}</td>
             @endif
         </tr>
         </tbody>
