@@ -44,11 +44,26 @@ class InstallmentContractMetricsService
         )->toDateString();
     }
 
-    public static function remainingInstallmentCount(InstallmentContract $contract, ?int $deductionCount = null): int
-    {
+    public static function remainingInstallmentCount(
+        InstallmentContract $contract,
+        ?int $deductionCount = null,
+        ?float $balance = null,
+    ): int {
         $deductionCount ??= (int) $contract->deductions()->count();
+        $fromSchedule = max(0, (int) $contract->installment_count - $deductionCount);
 
-        return max(0, (int) $contract->installment_count - $deductionCount);
+        $balance ??= (float) $contract->balance;
+
+        if ($balance > 0.001) {
+            $installmentAmount = (float) $contract->installment_amount;
+            $fromBalance = $installmentAmount > 0.001
+                ? (int) max(1, ceil(round($balance, 3) / $installmentAmount))
+                : 1;
+
+            return max($fromSchedule, $fromBalance);
+        }
+
+        return $fromSchedule;
     }
 
     public function recalculate(InstallmentContract $contract, ?Carbon $asOf = null): InstallmentContract
@@ -73,7 +88,8 @@ class InstallmentContractMetricsService
             ->where('installment_contract_id', $contract->id)
             ->sum('amount');
 
-        $installmentsRemaining = self::remainingInstallmentCount($contract, $deductionCount);
+        $balance = round((float) $contract->contract_total - $totalPaid, 3);
+        $installmentsRemaining = self::remainingInstallmentCount($contract, $deductionCount, $balance);
         $lateAmount = min(
             $this->calculateLateCount($contract, $nextInstallmentDate, $deductionCount, $asOf),
             $installmentsRemaining,
@@ -81,7 +97,7 @@ class InstallmentContractMetricsService
 
         $contract->forceFill([
             'total_paid' => $totalPaid,
-            'balance' => (float) $contract->contract_total - $totalPaid,
+            'balance' => $balance,
             'last_deduction_month' => $lastDeductionDate,
             'next_installment_date' => $nextInstallmentDate,
             'installments_remaining' => $installmentsRemaining,

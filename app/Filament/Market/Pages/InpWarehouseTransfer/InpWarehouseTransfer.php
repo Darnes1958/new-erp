@@ -22,8 +22,10 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 use RuntimeException;
+use Throwable;
 
 class InpWarehouseTransfer extends Page implements HasSchemas, HasTable
 {
@@ -270,7 +272,12 @@ class InpWarehouseTransfer extends Page implements HasSchemas, HasTable
             Notification::make()->title($exception->getMessage())->danger()->send();
 
             return;
-        } catch (\Throwable) {
+        } catch (Throwable $exception) {
+            Log::error('Warehouse transfer store failed', [
+                'message' => $exception->getMessage(),
+                'exception' => $exception,
+            ]);
+
             Notification::make()->title('حدث خطأ !!')->danger()->send();
 
             return;

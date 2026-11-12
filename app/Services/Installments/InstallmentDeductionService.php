@@ -54,10 +54,12 @@ class InstallmentDeductionService
 
         return DB::connection($contract->getConnectionName())->transaction(function () use ($contract, $deductionDate, $amount, $deductionTypeId, $notes, $batchId): array {
             $contract->refresh();
-            $balance = (float) $contract->balance;
-            $remainingInstallments = InstallmentContractMetricsService::remainingInstallmentCount($contract);
+            $balance = round((float) $contract->balance, 3);
 
-            if ($balance <= 0 || $remainingInstallments <= 0) {
+            // Surplus only when the contract is already settled. A leftover
+            // balance smaller than the usual installment (e.g. 70 of 200)
+            // is still a normal deduction even if installment_count is exhausted.
+            if ($balance <= 0.001) {
                 $this->createSurplus($contract, $deductionDate, $amount, batchId: $batchId);
 
                 return [
@@ -226,9 +228,9 @@ class InstallmentDeductionService
         ?string $notes,
         ?int $batchId,
     ): InstallmentDeduction {
-        if (InstallmentContractMetricsService::remainingInstallmentCount($contract) <= 0) {
+        if (round((float) $contract->balance, 3) <= 0.001) {
             throw ValidationException::withMessages([
-                'deducted_amount' => 'لا توجد أقساط متبقية على العقد.',
+                'deducted_amount' => 'لا يوجد رصيد متبقٍ على العقد.',
             ]);
         }
 

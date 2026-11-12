@@ -3,6 +3,7 @@
 namespace App\Services\Inventory;
 
 use App\Models\Item;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseInvoiceLine;
 use App\Models\StockMovement;
@@ -36,7 +37,7 @@ class WarehouseTransferService
             throw new RuntimeException('لم يتم ادخال اصناف');
         }
 
-        return DB::transaction(function () use ($warehouseFromId, $warehouseToId, $transferDate, $lines): WarehouseTransfer {
+        return $this->onCompanyConnection(function () use ($warehouseFromId, $warehouseToId, $transferDate, $lines): WarehouseTransfer {
             $salesInventory = app(SalesInventoryService::class);
 
             foreach ($lines as $line) {
@@ -63,7 +64,7 @@ class WarehouseTransferService
             $destinationInvoice = PurchaseInvoice::query()->create([
                 'invoice_date' => $transferDate,
                 'supplier_id' => null,
-                'payment_method_id' => 1,
+                'payment_method_id' => $this->defaultPaymentMethodId(),
                 'warehouse_id' => $warehouseToId,
                 'lines_subtotal' => 0,
                 'amount_paid' => 0,
@@ -99,7 +100,7 @@ class WarehouseTransferService
         $transferId = (int) $transfer->id;
         $lines = $transfer->lines;
 
-        DB::transaction(function () use ($transfer): void {
+        $this->onCompanyConnection(function () use ($transfer): void {
             $salesInventory = app(SalesInventoryService::class);
 
             foreach ($transfer->lines as $line) {
@@ -263,27 +264,20 @@ class WarehouseTransferService
     private function consumeFifoLayers(int $itemId, int $warehouseId, float $qtyPrimary): array
     {
         $salesInventory = app(SalesInventoryService::class);
-        $salesInventory->ensureFifoLayersForSale($itemId, $warehouseId, $qtyPrimary);
-
         $remainingToAllocate = $qtyPrimary;
         $allocations = [];
 
-        $layers = PurchaseInvoiceLine::query()
-            ->where('item_id', $itemId)
-            ->where('remaining_qty_primary', '>', 0)
-            ->whereHas('purchaseInvoice', fn ($query) => $query->where('warehouse_id', $warehouseId))
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get();
-
-        foreach ($layers as $layer) {
+        $takeFromLayer = function (PurchaseInvoiceLine $layer) use (&$remainingToAllocate, &$allocations): void {
             if ($remainingToAllocate <= 0.0001) {
-                break;
+                return;
             }
 
             $available = (float) $layer->remaining_qty_primary;
             $take = min($available, $remainingToAllocate);
+
+            if ($take <= 0.0001) {
+                return;
+            }
 
             $layer->update([
                 'remaining_qty_primary' => $available - $take,
@@ -296,47 +290,54 @@ class WarehouseTransferService
             ];
 
             $remainingToAllocate -= $take;
+        };
+
+        $layers = PurchaseInvoiceLine::query()
+            ->select('purchase_invoice_lines.*')
+            ->join('purchase_invoices', 'purchase_invoices.id', '=', 'purchase_invoice_lines.purchase_invoice_id')
+            ->where('purchase_invoice_lines.item_id', $itemId)
+            ->where('purchase_invoice_lines.remaining_qty_primary', '>', 0)
+            ->where('purchase_invoices.warehouse_id', $warehouseId)
+            ->orderBy('purchase_invoice_lines.id')
+            ->get();
+
+        foreach ($layers as $layer) {
+            $takeFromLayer($layer);
         }
 
         if ($remainingToAllocate > 0.0001) {
-            $salesInventory->ensureFifoLayersForSale($itemId, $warehouseId, $qtyPrimary);
-
-            $layers = PurchaseInvoiceLine::query()
-                ->where('item_id', $itemId)
-                ->where('remaining_qty_primary', '>', 0)
-                ->whereHas('purchaseInvoice', fn ($query) => $query->where('warehouse_id', $warehouseId))
-                ->orderBy('created_at')
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-
-            foreach ($layers as $layer) {
-                if ($remainingToAllocate <= 0.0001) {
-                    break;
-                }
-
-                $available = (float) $layer->remaining_qty_primary;
-                $take = min($available, $remainingToAllocate);
-
-                $layer->update([
-                    'remaining_qty_primary' => $available - $take,
-                ]);
-
-                $allocations[] = [
-                    'source_purchase_invoice_line_id' => (int) $layer->id,
-                    'qty_primary' => $take,
-                    'unit_cost' => (float) $layer->unit_cost_primary,
-                ];
-
-                $remainingToAllocate -= $take;
-            }
+            $layer = $salesInventory->createFifoAdjustmentLine($itemId, $warehouseId, $remainingToAllocate);
+            $takeFromLayer($layer);
         }
 
         if ($remainingToAllocate > 0.0001) {
-            throw new RuntimeException('حدث خطأ !! يرجي التواصل مع المبرمج');
+            throw new RuntimeException('رصيد طبقات التكلفة في مخزن المصدر لا يكفي لإتمام النقل');
         }
 
         return $allocations;
+    }
+
+    /**
+     * @template TReturn
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    private function onCompanyConnection(callable $callback): mixed
+    {
+        $connection = (new WarehouseTransfer)->getConnectionName() ?? config('database.default');
+
+        return DB::connection($connection)->transaction($callback);
+    }
+
+    private function defaultPaymentMethodId(): int
+    {
+        $id = PaymentMethod::query()->orderBy('id')->value('id');
+
+        if ($id === null) {
+            throw new RuntimeException('لا توجد طرق دفع معرفة في الشركة');
+        }
+
+        return (int) $id;
     }
 
     private function reverseLayer(WarehouseTransferLayer $layer): void

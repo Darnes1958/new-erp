@@ -4,6 +4,7 @@ namespace App\Services\Inventory;
 
 use App\Models\FifoAllocation;
 use App\Models\Item;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseInvoiceLine;
 use App\Models\SalesInvoice;
@@ -46,6 +47,22 @@ class SalesInventoryService
         }
 
         $this->replenishFifoShortfall($itemId, $warehouseId, $qtyPrimary - $availableFifo);
+    }
+
+    public function ensureFifoLayersForWarehouse(int $itemId, int $warehouseId, float $qtyPrimary): void
+    {
+        $availableFifo = $this->totalFifoRemainingForWarehouse($itemId, $warehouseId);
+
+        if ($availableFifo + 0.0001 >= $qtyPrimary) {
+            return;
+        }
+
+        $this->replenishFifoShortfall(
+            $itemId,
+            $warehouseId,
+            $qtyPrimary - $availableFifo,
+            sameWarehouseOnly: true,
+        );
     }
 
     public function restoreMissingFifoQty(int $itemId, int $warehouseId, float $qtyPrimary): void
@@ -264,15 +281,20 @@ class SalesInventoryService
         }
     }
 
-    protected function replenishFifoShortfall(int $itemId, int $warehouseId, float $shortfall): void
-    {
+    public function replenishFifoShortfall(
+        int $itemId,
+        int $warehouseId,
+        float $shortfall,
+        bool $sameWarehouseOnly = false,
+    ): void {
         if ($shortfall <= 0.0001) {
             return;
         }
 
         $remaining = $shortfall;
+        $scopes = $sameWarehouseOnly ? [$warehouseId] : [$warehouseId, null];
 
-        foreach ([$warehouseId, null] as $preferredWarehouseId) {
+        foreach ($scopes as $preferredWarehouseId) {
             if ($remaining <= 0.0001) {
                 break;
             }
@@ -335,7 +357,7 @@ class SalesInventoryService
         return $remaining;
     }
 
-    protected function createFifoAdjustmentLine(int $itemId, int $warehouseId, float $qtyPrimary): PurchaseInvoiceLine
+    public function createFifoAdjustmentLine(int $itemId, int $warehouseId, float $qtyPrimary): PurchaseInvoiceLine
     {
         $item = Item::query()->find($itemId);
         $unitCost = $this->resolveUnitCostForItem($itemId);
@@ -347,10 +369,16 @@ class SalesInventoryService
             ->first();
 
         if (! $invoice) {
+            $paymentMethodId = PaymentMethod::query()->orderBy('id')->value('id');
+
+            if ($paymentMethodId === null) {
+                throw new RuntimeException('لا توجد طرق دفع معرفة في الشركة');
+            }
+
             $invoice = PurchaseInvoice::query()->create([
                 'invoice_date' => today(),
                 'supplier_id' => null,
-                'payment_method_id' => 1,
+                'payment_method_id' => (int) $paymentMethodId,
                 'warehouse_id' => $warehouseId,
                 'lines_subtotal' => 0,
                 'amount_paid' => 0,
@@ -398,6 +426,15 @@ class SalesInventoryService
         return (float) PurchaseInvoiceLine::query()
             ->where('item_id', $itemId)
             ->where('remaining_qty_primary', '>', 0)
+            ->sum('remaining_qty_primary');
+    }
+
+    protected function totalFifoRemainingForWarehouse(int $itemId, int $warehouseId): float
+    {
+        return (float) PurchaseInvoiceLine::query()
+            ->where('item_id', $itemId)
+            ->where('remaining_qty_primary', '>', 0)
+            ->whereHas('purchaseInvoice', fn ($query) => $query->where('warehouse_id', $warehouseId))
             ->sum('remaining_qty_primary');
     }
 
