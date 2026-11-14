@@ -30,6 +30,19 @@ class OurCompany extends Model
         ];
     }
 
+    public function getAttribute($key): mixed
+    {
+        if ($key === 'CompanyName') {
+            return parent::getAttribute('display_name');
+        }
+
+        if ($key === 'CompanyNameSuffix') {
+            return parent::getAttribute('display_name_suffix');
+        }
+
+        return parent::getAttribute($key);
+    }
+
     public static function forCurrentUser(): ?self
     {
         $connectionName = Auth::user()?->company;

@@ -2,7 +2,6 @@
 
 namespace App\Exports\Market;
 
-use App\Exports\Installments\Concerns\RtlInstallmentSheet;
 use App\Models\OurCompany;
 use App\Support\Utf8Text;
 use Illuminate\Support\Collection;
@@ -14,11 +13,10 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 
 class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping, WithEvents
 {
-    use RtlInstallmentSheet;
-
     private const HEADER_ROW = 8;
 
     private const DATA_START_ROW = 9;
@@ -98,8 +96,8 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
         $header[] = 'سعر البيع';
 
         return [
-            [Utf8Text::clean($this->company?->CompanyName)],
-            [Utf8Text::clean($this->company?->CompanyNameSuffix)],
+            [Utf8Text::clean($this->company?->display_name)],
+            [Utf8Text::clean($this->company?->display_name_suffix)],
             [''],
             [Utf8Text::clean($this->reportTitle)],
             [$this->warehouseName ? Utf8Text::clean('المكان: '.$this->warehouseName) : ''],
@@ -114,7 +112,52 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
         return [
             AfterSheet::class => function (AfterSheet $event): void {
                 $sheet = $event->sheet->getDelegate();
-                $this->applyRtlSheet($sheet);
+                $sheet->setRightToLeft(true);
+
+                $columns = $this->columnLetters();
+                $lastColumn = $this->resolveLastColumn();
+                $nameColumn = $columns['name'];
+
+                $sheet->getPageSetup()
+                    ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
+                    ->setFitToPage(true)
+                    ->setFitToWidth(1)
+                    ->setFitToHeight(0);
+                $sheet->getSheetView()->setZoomScale(80);
+
+                $companyName = Utf8Text::clean($this->company?->display_name) ?? '';
+                $companySuffix = Utf8Text::clean($this->company?->display_name_suffix) ?? '';
+
+                $sheet->mergeCells("A1:{$nameColumn}1");
+                $sheet->mergeCells("A2:{$nameColumn}2");
+                $sheet->setCellValue('A1', $companyName);
+                $sheet->setCellValue('A2', $companySuffix);
+                $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+                $sheet->getStyle('A1:A2')->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT)
+                    ->setVertical(Alignment::VERTICAL_CENTER);
+
+                $sheet->setCellValue($lastColumn.'1', now()->format('Y/m/d'));
+                $sheet->getStyle($lastColumn.'1')->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+                    ->setVertical(Alignment::VERTICAL_CENTER);
+
+                foreach ([4, 5] as $titleRow) {
+                    $sheet->mergeCells("A{$titleRow}:{$lastColumn}{$titleRow}");
+                    $style = $sheet->getStyle("A{$titleRow}");
+                    $style->getAlignment()->setHorizontal(
+                        $titleRow === 4 ? Alignment::HORIZONTAL_CENTER : Alignment::HORIZONTAL_RIGHT,
+                    );
+                    $style->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+
+                    if ($titleRow === 4) {
+                        $style->getFont()->setBold(true)->setSize(13);
+                    }
+                }
+
+                foreach ($this->columnWidths($columns) as $letter => $width) {
+                    $sheet->getColumnDimension($letter)->setWidth($width);
+                }
 
                 $rowIndex = self::DATA_START_ROW;
 
@@ -158,7 +201,6 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
                         ->setBold(true);
                 }
 
-                $lastColumn = $this->resolveLastColumn();
                 $sheet->getStyle('A'.self::HEADER_ROW.':'.$lastColumn.self::HEADER_ROW)
                     ->getFill()
                     ->setFillType(Fill::FILL_SOLID)
@@ -176,21 +218,81 @@ class WarehouseStockExport implements FromCollection, WithHeadings, WithMapping,
         ];
     }
 
-    protected function resolveLastColumn(): string
+    /**
+     * @return array<string, string>
+     */
+    protected function columnLetters(): array
     {
-        $columns = 4;
+        $letter = 'A';
+        $next = static function () use (&$letter): string {
+            $current = $letter;
+            $letter++;
+
+            return $current;
+        };
+
+        $columns = [
+            'type' => $next(),
+        ];
 
         if ($this->multiWarehouse) {
-            $columns += 2;
+            $columns['warehouse'] = $next();
+        }
+
+        $columns['item_id'] = $next();
+        $columns['name'] = $next();
+        $columns['total_qty'] = $next();
+
+        if ($this->multiWarehouse) {
+            $columns['warehouse_qty'] = $next();
         }
 
         if ($this->showCosts) {
-            $columns += 4;
+            $columns['total_cost'] = $next();
+            $columns['avg_cost'] = $next();
+            $columns['buy_price'] = $next();
+            $columns['warehouse_cost'] = $next();
         }
 
-        $columns += 1;
+        $columns['sell_price'] = $next();
 
-        return chr(ord('A') + $columns - 1);
+        return $columns;
+    }
+
+    /**
+     * @param  array<string, string>  $columns
+     * @return array<string, float>
+     */
+    protected function columnWidths(array $columns): array
+    {
+        $widths = [
+            $columns['type'] => 16,
+            $columns['item_id'] => 10,
+            $columns['name'] => 32,
+            $columns['total_qty'] => 11,
+            $columns['sell_price'] => 11,
+        ];
+
+        if (isset($columns['warehouse'])) {
+            $widths[$columns['warehouse']] = 14;
+        }
+
+        if (isset($columns['warehouse_qty'])) {
+            $widths[$columns['warehouse_qty']] = 11;
+        }
+
+        foreach (['total_cost', 'avg_cost', 'buy_price', 'warehouse_cost'] as $key) {
+            if (isset($columns[$key])) {
+                $widths[$columns[$key]] = 12;
+            }
+        }
+
+        return $widths;
+    }
+
+    protected function resolveLastColumn(): string
+    {
+        return $this->columnLetters()['sell_price'];
     }
 
     protected function resolveTotalColumn(): string
