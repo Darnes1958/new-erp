@@ -24,6 +24,7 @@ class CompanyDataConverter
         $this->target = $target;
 
         $this->steps = [
+            'register_company' => fn () => $this->registerCompany(),
             'users' => fn () => $this->convertUsers(),
             'company_settings' => fn () => $this->convertCompanySettings(),
             'payment_methods' => fn () => $this->convertPaymentMethods(),
@@ -62,7 +63,13 @@ class CompanyDataConverter
         try {
             foreach ($steps as $name => $step) {
                 $this->log("Converting: {$name}");
-                DB::connection($this->target)->transaction($step);
+
+                if (in_array($name, ['register_company', 'company_settings', 'users'], true)) {
+                    $step();
+                } else {
+                    DB::connection($this->target)->transaction($step);
+                }
+
                 $this->log("Done: {$name}");
             }
         } finally {
@@ -126,6 +133,125 @@ class CompanyDataConverter
         $legacyAuth = config('erp.legacy_auth_connection', 'InsFila');
 
         (new AuthDataConverter($legacyAuth))->convertCompanyUsers($this->source, $this->target);
+    }
+
+    protected function registerCompany(): void
+    {
+        $profile = $this->resolveCompanyProfile();
+
+        DB::connection((string) config('erp.central_connection', 'sqlsrv'))
+            ->table('our_companies')
+            ->updateOrInsert(
+                ['connection_name' => $this->target],
+                $profile,
+            );
+
+        $this->log("Registered our_companies [{$this->target}] from [{$this->source}] ({$profile['display_name']})");
+    }
+
+    /**
+     * @return array{
+     *     display_name: string,
+     *     display_name_suffix: ?string,
+     *     comp_code: ?string,
+     *     address: ?string,
+     *     phone: ?string,
+     *     logo_path: ?string,
+     *     is_active: bool
+     * }
+     */
+    protected function resolveCompanyProfile(): array
+    {
+        $central = (string) config('erp.central_connection', 'sqlsrv');
+        $existing = DB::connection($central)
+            ->table('our_companies')
+            ->where('connection_name', $this->source)
+            ->first();
+
+        if ($existing) {
+            return [
+                'display_name' => (string) ($existing->display_name ?: $this->source),
+                'display_name_suffix' => $this->nullableString($existing->display_name_suffix ?? null),
+                'comp_code' => $this->nullableString($existing->comp_code ?? null),
+                'address' => $this->nullableString($existing->address ?? null),
+                'phone' => $this->nullableString($existing->phone ?? null),
+                'logo_path' => $this->nullableString($existing->logo_path ?? null),
+                'is_active' => true,
+            ];
+        }
+
+        $legacy = $this->findLegacyOurCompanyRow();
+
+        if ($legacy) {
+            return [
+                'display_name' => $this->nullableString($legacy->CompanyName ?? null) ?? $this->source,
+                'display_name_suffix' => $this->nullableString($legacy->CompanyNameSuffix ?? null),
+                'comp_code' => $this->nullableString($legacy->CompCode ?? null),
+                'address' => $this->nullableString($legacy->address ?? $legacy->Address ?? null),
+                'phone' => $this->nullableString($legacy->phone ?? $legacy->Phone ?? null),
+                'logo_path' => null,
+                'is_active' => true,
+            ];
+        }
+
+        return [
+            'display_name' => $this->source,
+            'display_name_suffix' => null,
+            'comp_code' => null,
+            'address' => null,
+            'phone' => null,
+            'logo_path' => null,
+            'is_active' => true,
+        ];
+    }
+
+    protected function findLegacyOurCompanyRow(): ?object
+    {
+        $connections = array_values(array_unique([
+            (string) config('erp.legacy_auth_connection', 'InsFila'),
+            $this->source,
+        ]));
+
+        foreach ($connections as $connection) {
+            if (! config("database.connections.{$connection}")) {
+                continue;
+            }
+
+            try {
+                if (! Schema::connection($connection)->hasTable('OurCompany')) {
+                    continue;
+                }
+
+                $query = DB::connection($connection)->table('OurCompany');
+                $row = (clone $query)->where('Company', $this->source)->first()
+                    ?? (clone $query)->where('Company', $this->target)->first();
+
+                if ($row) {
+                    return $row;
+                }
+
+                $only = $query->get();
+
+                if ($only->count() === 1) {
+                    return $only->first();
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    protected function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $string = trim((string) $value);
+
+        return $string === '' ? null : $string;
     }
 
     protected function convertCompanySettings(): void

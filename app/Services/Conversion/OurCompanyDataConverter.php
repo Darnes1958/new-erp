@@ -2,6 +2,7 @@
 
 namespace App\Services\Conversion;
 
+use App\Support\Conversion\LegacyConnectionNaming;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -33,14 +34,16 @@ class OurCompanyDataConverter
         }
 
         foreach ($rows as $row) {
-            $connectionName = trim((string) ($row->Company ?? ''));
+            $legacyName = trim((string) ($row->Company ?? ''));
 
-            if ($connectionName === '') {
+            if ($legacyName === '') {
                 continue;
             }
 
-            if (! in_array($connectionName, config('erp.company_connections', []), true)) {
-                $this->log("Skipping unknown connection [{$connectionName}]");
+            $connectionName = $this->resolveTargetConnectionName($legacyName);
+
+            if ($connectionName === null) {
+                $this->log("Skipping unknown connection [{$legacyName}]");
 
                 continue;
             }
@@ -57,7 +60,7 @@ class OurCompanyDataConverter
                 ],
             );
 
-            $this->log("Migrated company [{$connectionName}]");
+            $this->log("Migrated company [{$legacyName}] → [{$connectionName}]");
         }
     }
 
@@ -70,6 +73,28 @@ class OurCompanyDataConverter
 
             DB::connection($connection)->getPdo();
         }
+    }
+
+    protected function resolveTargetConnectionName(string $legacyName): ?string
+    {
+        $targetName = LegacyConnectionNaming::targetName($legacyName);
+        $configured = config('erp.company_connections', []);
+
+        foreach ([$targetName, $legacyName] as $candidate) {
+            if (config("database.connections.{$candidate}") && in_array($candidate, $configured, true)) {
+                return $candidate;
+            }
+        }
+
+        if (config("database.connections.{$targetName}")) {
+            return $targetName;
+        }
+
+        if (config("database.connections.{$legacyName}")) {
+            return $legacyName;
+        }
+
+        return null;
     }
 
     protected function legacyTableExists(): bool
