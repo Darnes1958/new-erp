@@ -57,10 +57,16 @@ class CompanyDataConverter
             ? array_intersect_key($this->steps, array_flip($only))
             : $this->steps;
 
-        foreach ($steps as $name => $step) {
-            $this->log("Converting: {$name}");
-            DB::connection($this->target)->transaction($step);
-            $this->log("Done: {$name}");
+        $this->disableForeignKeys();
+
+        try {
+            foreach ($steps as $name => $step) {
+                $this->log("Converting: {$name}");
+                DB::connection($this->target)->transaction($step);
+                $this->log("Done: {$name}");
+            }
+        } finally {
+            $this->enableForeignKeys();
         }
     }
 
@@ -344,31 +350,7 @@ class CompanyDataConverter
 
     protected function convertPurchases(): void
     {
-        $buyLinesByReturn = $this->sourceQuery('buy_trans')
-            ->filter(fn ($row) => filled($row->tar_buy_id ?? null) && (int) $row->tar_buy_id !== 0)
-            ->keyBy('tar_buy_id');
-
-        $this->insertWithIdentity('purchase_returns', $this->sourceQuery('tar_buys')->map(function ($row) use ($buyLinesByReturn) {
-            $line = $buyLinesByReturn->get($row->id);
-
-            return [
-                'id' => (int) $row->id,
-                'purchase_invoice_id' => (int) $row->buy_id,
-                'purchase_invoice_line_id' => $line ? (int) $line->id : null,
-                'item_id' => (int) $row->item_id,
-                'return_date' => $row->tar_date ?? $row->created_at,
-                'qty_primary' => $row->q1 ?? 0,
-                'qty_secondary' => $row->q2 ?? 0,
-                'unit_cost_primary' => $row->p1 ?? 0,
-                'line_total' => $row->sub_tot ?? 0,
-                'notes' => null,
-                'created_by' => $row->user_id ?? null,
-                'created_at' => $row->created_at,
-                'updated_at' => $row->updated_at,
-            ];
-        })->all());
-
-        $this->insertWithIdentity('purchase_invoices', $this->sourceQuery('buys')->map(fn ($row) => [
+        $invoices = $this->sourceQuery('buys')->map(fn ($row) => [
             'id' => (int) $row->id,
             'invoice_date' => $row->order_date,
             'supplier_id' => $row->supplier_id,
@@ -381,54 +363,90 @@ class CompanyDataConverter
             'created_by' => $row->user_id,
             'created_at' => $row->created_at,
             'updated_at' => $row->updated_at,
-        ])->all());
+        ]);
 
-        $this->insertWithIdentity('purchase_invoice_lines', $this->sourceQuery('buy_trans')->map(fn ($row) => [
-            'id' => (int) $row->id,
-            'purchase_invoice_id' => (int) $row->buy_id,
-            'item_id' => (int) $row->item_id,
-            'barcode' => $row->barcode_id,
-            'qty_primary' => $row->q1 ?? 0,
-            'qty_secondary' => $row->q2 ?? 0,
-            'unit_cost_primary' => $row->price_input ?? 0,
-            'line_cost_total' => $row->sub_input ?? 0,
-            'remaining_qty_primary' => $row->qs1 ?? 0,
-            'remaining_qty_secondary' => $row->qs2 ?? 0,
-            'purchase_return_id' => $row->tar_buy_id,
-            'expiry_date' => $row->exp_date ?? null,
-            'created_by' => $row->user_id,
-            'created_at' => $row->created_at,
-            'updated_at' => $row->updated_at,
-        ])->all());
+        $this->insertWithIdentity('purchase_invoices', $invoices->all());
+        $invoiceIds = $invoices->pluck('id')->flip();
+
+        $buyLinesByReturn = $this->sourceQuery('buy_trans')
+            ->filter(fn ($row) => filled($row->tar_buy_id ?? null) && (int) $row->tar_buy_id !== 0)
+            ->keyBy('tar_buy_id');
+
+        $lines = $this->sourceQuery('buy_trans')
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'purchase_invoice_id' => (int) $row->buy_id,
+                'item_id' => (int) $row->item_id,
+                'barcode' => $row->barcode_id,
+                'qty_primary' => $row->q1 ?? 0,
+                'qty_secondary' => $row->q2 ?? 0,
+                'unit_cost_primary' => $row->price_input ?? 0,
+                'line_cost_total' => $row->sub_input ?? 0,
+                'remaining_qty_primary' => $row->qs1 ?? 0,
+                'remaining_qty_secondary' => $row->qs2 ?? 0,
+                'purchase_return_id' => $row->tar_buy_id,
+                'expiry_date' => $row->exp_date ?? null,
+                'created_by' => $row->user_id,
+                'created_at' => $row->created_at,
+                'updated_at' => $row->updated_at,
+            ])
+            ->filter(fn (array $row) => $invoiceIds->has($row['purchase_invoice_id']));
+
+        $this->insertWithIdentity('purchase_invoice_lines', $lines->map(function (array $row) {
+            $row['purchase_return_id'] = null;
+
+            return $row;
+        })->all());
+
+        $lineIds = $lines->pluck('id')->flip();
+        $returnIds = $this->sourceQuery('tar_buys')
+            ->map(function ($row) use ($buyLinesByReturn, $invoiceIds, $lineIds) {
+                if (! $invoiceIds->has((int) $row->buy_id)) {
+                    return null;
+                }
+
+                $line = $buyLinesByReturn->get($row->id);
+                $lineId = $line ? (int) $line->id : null;
+
+                return [
+                    'id' => (int) $row->id,
+                    'purchase_invoice_id' => (int) $row->buy_id,
+                    'purchase_invoice_line_id' => ($lineId !== null && $lineIds->has($lineId)) ? $lineId : null,
+                    'item_id' => (int) $row->item_id,
+                    'return_date' => $row->tar_date ?? $row->created_at,
+                    'qty_primary' => $row->q1 ?? 0,
+                    'qty_secondary' => $row->q2 ?? 0,
+                    'unit_cost_primary' => $row->p1 ?? 0,
+                    'line_total' => $row->sub_tot ?? 0,
+                    'notes' => null,
+                    'created_by' => $row->user_id ?? null,
+                    'created_at' => $row->created_at,
+                    'updated_at' => $row->updated_at,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        $this->insertWithIdentity('purchase_returns', $returnIds->all());
+
+        $importedReturnIds = $returnIds->pluck('id')->flip();
+
+        foreach ($lines as $line) {
+            $returnId = $line['purchase_return_id'] ?? null;
+
+            if (! filled($returnId) || ! $importedReturnIds->has((int) $returnId)) {
+                continue;
+            }
+
+            DB::connection($this->target)->table('purchase_invoice_lines')
+                ->where('id', $line['id'])
+                ->update(['purchase_return_id' => (int) $returnId]);
+        }
     }
 
     protected function convertSales(): void
     {
-        $sellLinesByReturn = $this->sourceQuery('sell_trans')
-            ->filter(fn ($row) => filled($row->tar_sell_id ?? null) && (int) $row->tar_sell_id !== 0)
-            ->keyBy('tar_sell_id');
-
-        $this->insertWithIdentity('sales_returns', $this->sourceQuery('tar_sells')->map(function ($row) use ($sellLinesByReturn) {
-            $line = $sellLinesByReturn->get($row->id);
-
-            return [
-                'id' => (int) $row->id,
-                'sales_invoice_id' => (int) $row->sell_id,
-                'sales_invoice_line_id' => $line ? (int) $line->id : null,
-                'item_id' => (int) $row->item_id,
-                'return_date' => $row->tar_date ?? $row->created_at,
-                'qty_primary' => $row->q1 ?? 0,
-                'qty_secondary' => $row->q2 ?? 0,
-                'unit_price_primary' => $row->p1 ?? 0,
-                'line_total' => $row->sub_tot ?? 0,
-                'notes' => null,
-                'created_by' => $row->user_id ?? null,
-                'created_at' => $row->created_at,
-                'updated_at' => $row->updated_at,
-            ];
-        })->all());
-
-        $this->insertWithIdentity('sales_invoices', $this->sourceQuery('sells')->map(fn ($row) => [
+        $invoices = $this->sourceQuery('sells')->map(fn ($row) => [
             'id' => (int) $row->id,
             'invoice_date' => $row->order_date,
             'customer_id' => $row->customer_id,
@@ -450,24 +468,91 @@ class CompanyDataConverter
             'created_by' => $row->user_id,
             'created_at' => $row->created_at,
             'updated_at' => $row->updated_at,
-        ])->all());
+        ]);
 
-        $this->insertWithIdentity('sales_invoice_lines', $this->sourceQuery('sell_trans')->map(fn ($row) => [
-            'id' => (int) $row->id,
-            'sales_invoice_id' => (int) $row->sell_id,
-            'item_id' => (int) $row->item_id,
-            'barcode' => $row->barcode_id,
-            'qty_primary' => $row->q1 ?? 0,
-            'qty_secondary' => $row->q2 ?? 0,
-            'unit_price_primary' => $row->price1 ?? 0,
-            'unit_price_secondary' => $row->price2 ?? 0,
-            'line_total' => $row->sub_tot ?? 0,
-            'profit' => $row->profit ?? 0,
-            'sales_return_id' => $row->tar_sell_id,
-            'created_by' => $row->user_id,
-            'created_at' => $row->created_at,
-            'updated_at' => $row->updated_at,
-        ])->all());
+        $this->insertWithIdentity('sales_invoices', $invoices->all());
+        $invoiceIds = $invoices->pluck('id')->flip();
+
+        $sellLinesByReturn = $this->sourceQuery('sell_trans')
+            ->filter(fn ($row) => filled($row->tar_sell_id ?? null) && (int) $row->tar_sell_id !== 0)
+            ->keyBy('tar_sell_id');
+
+        $lines = $this->sourceQuery('sell_trans')
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'sales_invoice_id' => (int) $row->sell_id,
+                'item_id' => (int) $row->item_id,
+                'barcode' => $row->barcode_id,
+                'qty_primary' => $row->q1 ?? 0,
+                'qty_secondary' => $row->q2 ?? 0,
+                'unit_price_primary' => $row->price1 ?? 0,
+                'unit_price_secondary' => $row->price2 ?? 0,
+                'line_total' => $row->sub_tot ?? 0,
+                'profit' => $row->profit ?? 0,
+                'sales_return_id' => $row->tar_sell_id,
+                'created_by' => $row->user_id,
+                'created_at' => $row->created_at,
+                'updated_at' => $row->updated_at,
+            ])
+            ->filter(fn (array $row) => $invoiceIds->has($row['sales_invoice_id']));
+
+        $this->insertWithIdentity('sales_invoice_lines', $lines->map(function (array $row) {
+            $row['sales_return_id'] = null;
+
+            return $row;
+        })->all());
+
+        $lineIds = $lines->pluck('id')->flip();
+        $sourceReturns = $this->sourceQuery('tar_sells');
+        $returns = $sourceReturns
+            ->map(function ($row) use ($sellLinesByReturn, $invoiceIds, $lineIds) {
+                if (! $invoiceIds->has((int) $row->sell_id)) {
+                    return null;
+                }
+
+                $line = $sellLinesByReturn->get($row->id);
+                $lineId = $line ? (int) $line->id : null;
+
+                return [
+                    'id' => (int) $row->id,
+                    'sales_invoice_id' => (int) $row->sell_id,
+                    'sales_invoice_line_id' => ($lineId !== null && $lineIds->has($lineId)) ? $lineId : null,
+                    'item_id' => (int) $row->item_id,
+                    'return_date' => $row->tar_date ?? $row->created_at,
+                    'qty_primary' => $row->q1 ?? 0,
+                    'qty_secondary' => $row->q2 ?? 0,
+                    'unit_price_primary' => $row->p1 ?? 0,
+                    'line_total' => $row->sub_tot ?? 0,
+                    'notes' => null,
+                    'created_by' => $row->user_id ?? null,
+                    'created_at' => $row->created_at,
+                    'updated_at' => $row->updated_at,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        $skippedReturns = $sourceReturns->count() - $returns->count();
+
+        if ($skippedReturns > 0) {
+            $this->log("Skipped {$skippedReturns} sales return(s) with missing sales invoices.");
+        }
+
+        $this->insertWithIdentity('sales_returns', $returns->all());
+
+        $importedReturnIds = $returns->pluck('id')->flip();
+
+        foreach ($lines as $line) {
+            $returnId = $line['sales_return_id'] ?? null;
+
+            if (! filled($returnId) || ! $importedReturnIds->has((int) $returnId)) {
+                continue;
+            }
+
+            DB::connection($this->target)->table('sales_invoice_lines')
+                ->where('id', $line['id'])
+                ->update(['sales_return_id' => (int) $returnId]);
+        }
     }
 
     protected function convertFifo(): void
@@ -1032,6 +1117,16 @@ class CompanyDataConverter
         }
 
         DB::connection($this->target)->statement('EXEC sp_MSforeachtable "ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL"');
+    }
+
+    protected function disableForeignKeys(): void
+    {
+        DB::connection($this->target)->statement('EXEC sp_MSforeachtable "ALTER TABLE ? NOCHECK CONSTRAINT ALL"');
+    }
+
+    protected function enableForeignKeys(): void
+    {
+        DB::connection($this->target)->statement('EXEC sp_MSforeachtable "ALTER TABLE ? WITH NOCHECK CHECK CONSTRAINT ALL"');
     }
 
     protected function log(string $message): void
