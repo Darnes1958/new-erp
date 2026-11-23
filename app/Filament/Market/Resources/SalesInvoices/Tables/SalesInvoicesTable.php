@@ -5,6 +5,7 @@ namespace App\Filament\Market\Resources\SalesInvoices\Tables;
 use App\Filament\Market\Resources\SalesInvoices\Pages\EditSell;
 use App\Filament\Market\Resources\SalesInvoices\Pages\SalesReturnEntry;
 use App\Filament\Market\Support\SalesInvoiceDispatchPrintAction;
+use App\Filament\Market\Support\SalesInvoicePurchaseDetailsAction;
 use App\Filament\Market\Support\SalesInvoiceViewModalAction;
 use App\Models\SalesInvoice;
 use App\Services\Inventory\SalesInvoiceCancelService;
@@ -90,6 +91,7 @@ class SalesInvoicesTable
             ])
             ->recordActions([
                 SalesInvoiceViewModalAction::make(),
+                SalesInvoicePurchaseDetailsAction::make(),
                 Action::make('print')
                     ->label('طباعة')
                     ->icon('heroicon-o-printer')

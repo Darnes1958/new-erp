@@ -40,15 +40,22 @@ class InstallmentContractService
 
     public static function eligibleMergeSalesInvoicesQuery()
     {
-        $customerIds = InstallmentContract::query()->distinct()->pluck('customer_id');
-
-        return static::eligibleSalesInvoicesQuery()
-            ->whereIn('customer_id', $customerIds);
+        return static::constrainToCustomersWithActiveContract(
+            static::eligibleSalesInvoicesQuery(),
+        );
     }
 
     public static function eligibleSalesInvoicesQueryForEdit(int $currentInvoiceId)
     {
         return static::constrainEligibleSalesInvoices(SalesInvoice::query(), $currentInvoiceId);
+    }
+
+    protected static function constrainToCustomersWithActiveContract(Builder $query): Builder
+    {
+        return $query->whereIn(
+            'customer_id',
+            InstallmentContract::query()->select('customer_id'),
+        );
     }
 
     public static function constrainEligibleSalesInvoices(Builder $query, ?int $keepInvoiceId = null): Builder
@@ -100,10 +107,7 @@ class InstallmentContractService
             : static::eligibleSalesInvoicesQuery();
 
         if ($mergeOnly) {
-            $query->whereIn(
-                'customer_id',
-                InstallmentContract::query()->distinct()->pluck('customer_id'),
-            );
+            static::constrainToCustomersWithActiveContract($query);
         }
 
         if (filled($search)) {

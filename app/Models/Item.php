@@ -77,6 +77,15 @@ class Item extends CompanyModel
 
     public function sellPriceFor(int $paymentMethodId): float
     {
+        if ($this->relationLoaded('prices')) {
+            $price = $this->prices->first(
+                fn (ItemPrice $price): bool => (int) $price->payment_method_id === $paymentMethodId
+                    && $price->price_kind === 'sell',
+            );
+
+            return (float) ($price?->price_primary ?? 0);
+        }
+
         return (float) ($this->prices()
             ->where('payment_method_id', $paymentMethodId)
             ->where('price_kind', 'sell')

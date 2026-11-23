@@ -2,6 +2,7 @@
 
 namespace App\Filament\Market\Pages\Concerns;
 
+use App\Filament\Market\Support\SalesInvoicePurchaseDetailsAction;
 use App\Filament\Market\Pages\InpSell\Schemas\SalesHeaderForm;
 use App\Filament\Market\Pages\InpSell\Schemas\SalesLineForm;
 use App\Filament\Market\Pages\InpSell\Schemas\SalesStoreForm;
@@ -379,6 +380,9 @@ trait InteractsWithSalesEntry
                     ->label('المجموع')
                     ->numeric(3)
                     ->sortable(),
+            ])
+            ->headerActions([
+                SalesInvoicePurchaseDetailsAction::forDraft(),
             ])
             ->recordActions([
                 Action::make('edit_line')

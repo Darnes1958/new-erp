@@ -658,15 +658,35 @@ class InsCompanyDataConverter
 
             $mainArcRows = $this->legacyMainArcRows();
 
-            $archiveIdByContractNo = $mainArcRows
-                ->groupBy(fn ($row) => (int) $row->no)
-                ->map(fn (Collection $rows) => $rows->min(
-                    fn ($row) => InsMainArc::archiveIdFromRow($row, $this->source)
-                ));
+            $takenArchiveIds = DB::connection($this->target)
+                ->table('installment_contracts')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->flip()
+                ->all();
 
-            $archives = $mainArcRows->map(function ($row) use ($archivedContractEnds, $salesInvoiceIds) {
+            $archiveIdByContractNo = collect();
+
+            $archives = $mainArcRows->map(function ($row) use ($archivedContractEnds, $salesInvoiceIds, &$takenArchiveIds, $archiveIdByContractNo) {
                 $mapped = $this->mapInsContractRow($row, $archivedContractEnds);
-                $mapped['id'] = InsMainArc::archiveIdFromRow($row, $this->source);
+                $contractNo = (int) $row->no;
+                $archiveId = InsMainArc::archiveIdFromRow($row, $this->source);
+
+                if (isset($takenArchiveIds[$archiveId])) {
+                    $archiveId = InsMainArc::ID_OFFSET + $contractNo;
+                }
+
+                if (isset($takenArchiveIds[$archiveId])) {
+                    $archiveId = InsMainArc::ID_OFFSET + (int) ($row->order_no ?? $contractNo);
+                }
+
+                $takenArchiveIds[$archiveId] = true;
+
+                if (! $archiveIdByContractNo->has($contractNo)) {
+                    $archiveIdByContractNo[$contractNo] = $archiveId;
+                }
+
+                $mapped['id'] = $archiveId;
 
                 if ($mapped['sales_invoice_id'] !== null && ! $salesInvoiceIds->has($mapped['sales_invoice_id'])) {
                     $mapped['sales_invoice_id'] = null;

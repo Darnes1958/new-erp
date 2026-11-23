@@ -20,6 +20,10 @@ final class InsMainArc
 
     public static function archiveIdFromRow(object $row, string $legacyConnection): int
     {
+        if (filled($row->no ?? null) && (int) $row->no > 0 && self::hasLegacyIdColumn($legacyConnection)) {
+            return (int) $row->no;
+        }
+
         if (self::hasLegacyIdColumn($legacyConnection)) {
             return (int) $row->id;
         }
@@ -30,7 +34,7 @@ final class InsMainArc
     public static function sqlArchiveIdExpression(string $legacyConnection, string $alias = 'ma'): string
     {
         if (self::hasLegacyIdColumn($legacyConnection)) {
-            return "CAST({$alias}.id AS BIGINT)";
+            return "CAST({$alias}.no AS BIGINT)";
         }
 
         return "CAST({$alias}.order_no AS BIGINT) + ".self::ID_OFFSET;
@@ -39,7 +43,7 @@ final class InsMainArc
     public static function sqlMinArchiveIdExpression(string $legacyConnection, string $alias = 'ma'): string
     {
         if (self::hasLegacyIdColumn($legacyConnection)) {
-            return "MIN(CAST({$alias}.id AS BIGINT))";
+            return "MIN(CAST({$alias}.no AS BIGINT))";
         }
 
         return 'MIN(CAST('.$alias.'.order_no AS BIGINT) + '.self::ID_OFFSET.')';

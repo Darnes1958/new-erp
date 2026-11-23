@@ -167,7 +167,7 @@ class InsArchivedStopRepairService
         if (InsMainArc::hasLegacyIdColumn($legacy)) {
             $rows = DB::connection($legacy)
                 ->table('MainArc')
-                ->selectRaw('no, MIN(CAST(id AS BIGINT)) AS archive_id')
+                ->selectRaw('no, MIN(CAST(no AS BIGINT)) AS archive_id')
                 ->groupBy('no')
                 ->get();
         } else {

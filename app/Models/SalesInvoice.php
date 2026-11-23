@@ -73,6 +73,11 @@ class SalesInvoice extends CompanyModel
         return $this->hasMany(SalesInvoiceLine::class);
     }
 
+    public function fifoAllocations(): HasMany
+    {
+        return $this->hasMany(FifoAllocation::class);
+    }
+
     public function receipts(): HasMany
     {
         return $this->hasMany(CustomerReceipt::class);

@@ -35,6 +35,10 @@ class PurchaseInvoice extends CompanyModel
         });
 
         static::saved(function (PurchaseInvoice $invoice): void {
+            if ($invoice->wasRecentlyCreated) {
+                return;
+            }
+
             if ($invoice->wasChanged(['amount_paid', 'discount'])) {
                 $invoice->recalculateTotals();
             }

@@ -6,6 +6,7 @@ use App\Filament\Ins\Support\InstallmentListPrintActions;
 use App\Filament\Market\Pages\Reports\Concerns\RendersInvoiceReportContent;
 use App\Filament\Market\Support\MarketNavigationGroup;
 use App\Filament\Market\Support\SalesInvoiceDispatchPrintAction;
+use App\Filament\Market\Support\SalesInvoicePurchaseDetailsAction;
 use App\Filament\Market\Support\SalesInvoiceViewModalAction;
 use App\Models\Customer;
 use App\Models\SalesInvoice;
@@ -264,6 +265,7 @@ class SalesInvoicesReportPage extends Page implements HasActions, HasForms, HasT
             ])
             ->recordActions([
                 SalesInvoiceViewModalAction::make(),
+                SalesInvoicePurchaseDetailsAction::make(),
                 Action::make('print')
                     ->icon('heroicon-o-printer')
                     ->iconButton()

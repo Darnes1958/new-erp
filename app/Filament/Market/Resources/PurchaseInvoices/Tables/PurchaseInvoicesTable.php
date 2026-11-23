@@ -13,9 +13,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Notifications\Notification;
-use Filament\Tables\Columns\Layout\Panel;
-use Filament\Tables\Columns\Layout\Split;
-use Filament\Tables\Columns\Layout\View;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -32,52 +29,41 @@ class PurchaseInvoicesTable
             ->recordUrl(false)
             ->extraAttributes(['class' => 'purchase-invoices-table'])
             ->columns([
-                Split::make([
-                    TextColumn::make('id')
-                        ->label('الرقم')
-                        ->sortable()
-                        ->searchable(),
-                    TextColumn::make('supplier.name')
-                        ->label('المورد')
-                        ->sortable()
-                        ->searchable(),
-                    TextColumn::make('invoice_date')
-                        ->label('التاريخ')
-                        ->date()
-                        ->sortable(),
-                    TextColumn::make('net_total')
-                        ->label('الإجمالي')
-                        ->getStateUsing(fn (PurchaseInvoice $record): float => (float) $record->lines_subtotal - (float) $record->discount)
-                        ->numeric(3)
-                        ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw("(lines_subtotal - discount) {$direction}")),
-                    TextColumn::make('amount_paid')
-                        ->label('المدفوع')
-                        ->numeric(3),
-                    TextColumn::make('balance')
-                        ->label('الباقي')
-                        ->numeric(3),
-                    TextColumn::make('lines_count')
-                        ->label('البنود')
-                        ->counts('lines')
-                        ->badge()
-                        ->color('gray'),
-                    TextColumn::make('warehouse.name')
-                        ->label('المخزن')
-                        ->toggleable(),
-                    TextColumn::make('notes')
-                        ->label('ملاحظات')
-                        ->limit(30)
-                        ->toggleable(),
-                ])->from('lg'),
-                Panel::make([
-                    View::make('filament.market.tables.purchase-invoice-lines')
-                        ->grow(),
-                ])
-                    ->collapsible()
-                    ->grow()
-                    ->extraAttributes([
-                        'class' => '!w-full !max-w-none !p-0 !bg-transparent !shadow-none !ring-0',
-                    ]),
+                TextColumn::make('id')
+                    ->label('الرقم')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('supplier.name')
+                    ->label('المورد')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('invoice_date')
+                    ->label('التاريخ')
+                    ->date()
+                    ->sortable(),
+                TextColumn::make('net_total')
+                    ->label('الإجمالي')
+                    ->getStateUsing(fn (PurchaseInvoice $record): float => (float) $record->lines_subtotal - (float) $record->discount)
+                    ->numeric(3)
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw("(lines_subtotal - discount) {$direction}")),
+                TextColumn::make('amount_paid')
+                    ->label('المدفوع')
+                    ->numeric(3),
+                TextColumn::make('balance')
+                    ->label('الباقي')
+                    ->numeric(3),
+                TextColumn::make('lines_count')
+                    ->label('البنود')
+                    ->counts('lines')
+                    ->badge()
+                    ->color('gray'),
+                TextColumn::make('warehouse.name')
+                    ->label('المخزن')
+                    ->toggleable(),
+                TextColumn::make('notes')
+                    ->label('ملاحظات')
+                    ->limit(30)
+                    ->toggleable(),
             ])
             ->defaultSort('id', 'desc')
             ->striped()

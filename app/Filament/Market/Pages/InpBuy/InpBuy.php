@@ -83,6 +83,7 @@ class InpBuy extends Page implements HasSchemas, HasTable
     {
         $inventory = app(PurchaseInventoryService::class);
 
+        $this->refreshPaymentTotals();
         $this->work->refresh();
 
         if ($this->work->supplier_id === null) {
@@ -159,6 +160,9 @@ class InpBuy extends Page implements HasSchemas, HasTable
             $cashBoxId,
             $bankAccountId,
         ): void {
+            $netTotal = (float) $this->work->lines_subtotal - (float) $this->work->discount;
+            $amountPaid = (float) $this->work->amount_paid;
+
             $invoice = PurchaseInvoice::query()->create([
                 'invoice_date' => $this->work->invoice_date,
                 'supplier_id' => $this->work->supplier_id,
@@ -166,8 +170,8 @@ class InpBuy extends Page implements HasSchemas, HasTable
                 'warehouse_id' => $warehouseId,
                 'lines_subtotal' => $this->work->lines_subtotal,
                 'discount' => $this->work->discount,
-                'amount_paid' => $this->work->amount_paid,
-                'balance' => $this->work->balance,
+                'amount_paid' => $amountPaid,
+                'balance' => $netTotal - $amountPaid,
                 'notes' => $this->work->notes,
                 'created_by' => Auth::id(),
             ]);
@@ -201,7 +205,7 @@ class InpBuy extends Page implements HasSchemas, HasTable
                 );
             }
 
-            if ((float) $this->work->amount_paid > 0) {
+            if ($amountPaid > 0) {
                 SupplierPayment::query()->create([
                     'payment_date' => $this->work->invoice_date,
                     'supplier_id' => $this->work->supplier_id,
@@ -209,7 +213,7 @@ class InpBuy extends Page implements HasSchemas, HasTable
                     'payment_method_id' => $this->work->payment_method_id,
                     'transaction_kind' => 5,
                     'flow_direction' => 1,
-                    'amount' => $this->work->amount_paid,
+                    'amount' => $amountPaid,
                     'warehouse_id' => $warehouseId,
                     'cash_box_id' => $cashBoxId,
                     'bank_account_id' => $bankAccountId,
@@ -217,6 +221,9 @@ class InpBuy extends Page implements HasSchemas, HasTable
                     'created_by' => Auth::id(),
                 ]);
             }
+
+            $invoice->refresh();
+            $invoice->recalculateTotals();
 
             PurchaseInvoiceLineWork::query()
                 ->where('purchase_invoice_work_id', Auth::id())
