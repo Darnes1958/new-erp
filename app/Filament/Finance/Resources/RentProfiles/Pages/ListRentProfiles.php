@@ -2,10 +2,12 @@
 
 namespace App\Filament\Finance\Resources\RentProfiles\Pages;
 
+use App\Enums\RentTransactionType;
 use App\Filament\Finance\Resources\RentProfiles\RentProfileResource;
 use App\Models\BankAccount;
 use App\Models\CashBox;
 use App\Models\RentProfile;
+use App\Models\RentTransaction;
 use App\Services\Finance\RentTransactionService;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -118,6 +120,41 @@ class ListRentProfiles extends ListRecords
                     ]);
 
                     Notification::make()->title('تم عملية السحب بنجاح')->success()->send();
+                }),
+            Action::make('cancelMonthlyRents')
+                ->label('إلغاء إيجار')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->schema([
+                    Select::make('period_month')
+                        ->label('عن شهر')
+                        ->options(fn (): array => RentTransaction::query()
+                            ->where('transaction_type', RentTransactionType::Rent->value)
+                            ->where('period_month', '!=', '0')
+                            ->distinct()
+                            ->orderByDesc('period_month')
+                            ->pluck('period_month', 'period_month')
+                            ->all())
+                        ->required(),
+                    Select::make('rent_profile_id')
+                        ->label('المكان أو اتركه فارغاً للكل')
+                        ->options(fn (): array => RentProfile::query()->orderBy('name')->pluck('name', 'id')->all())
+                        ->searchable()
+                        ->preload(),
+                ])
+                ->action(function (array $data): void {
+                    $deleted = app(RentTransactionService::class)->cancelMonthlyRents(
+                        $data['period_month'],
+                        isset($data['rent_profile_id']) ? (int) $data['rent_profile_id'] : null,
+                    );
+
+                    if ($deleted < 1) {
+                        Notification::make()->title('لا توجد حركات لإلغائها')->warning()->send();
+
+                        return;
+                    }
+
+                    Notification::make()->title('تم إلغاء الإيجار بنجاح')->success()->send();
                 }),
         ];
     }

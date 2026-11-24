@@ -6,15 +6,23 @@ use App\Enums\RentTransactionType;
 use App\Filament\Finance\Pages\Reports\Concerns\InteractsWithFinanceMovementReportExports;
 use App\Filament\Finance\Support\FinanceNavigationGroup;
 use App\Filament\Ins\Support\InstallmentListPrintActions;
+use App\Models\BankAccount;
+use App\Models\CashBox;
 use App\Models\RentProfile;
+use App\Models\RentTransaction;
 use App\Services\Excel\FinanceExcelService;
 use App\Services\Finance\FinanceMovementReportService;
+use App\Services\Finance\RentTransactionService;
 use App\Services\Pdf\FinanceMovementPdfService;
 use App\Support\PdfDownload;
+use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
@@ -171,10 +179,103 @@ class RentMovementReportPage extends Page implements HasActions, HasForms, HasTa
                     ->label('ملاحظات')
                     ->limit(40),
             ])
+            ->recordActions([
+                Action::make('editMovement')
+                    ->label('تعديل')
+                    ->icon('heroicon-m-pencil-square')
+                    ->modalSubmitActionLabel('حفظ')
+                    ->fillForm(function (RentTransaction $record): array {
+                        return [
+                            'transaction_date' => $record->transaction_date,
+                            'period_month' => $record->period_month,
+                            'amount' => $record->amount,
+                            'notes' => $record->notes,
+                            'pay_type' => $record->bank_account_id ? 2 : 1,
+                            'bank_account_id' => $record->bank_account_id,
+                            'cash_box_id' => $record->cash_box_id,
+                        ];
+                    })
+                    ->schema(fn (RentTransaction $record): array => $this->movementEditSchema($record))
+                    ->action(function (RentTransaction $record, array $data): void {
+                        $payType = (int) ($data['pay_type'] ?? 1);
+                        app(RentTransactionService::class)->updateTransaction($record, [
+                            'transaction_date' => $data['transaction_date'],
+                            'amount' => $data['amount'],
+                            'notes' => $data['notes'] ?? null,
+                            'period_month' => $data['period_month'] ?? $record->period_month,
+                            'bank_account_id' => $payType === 2 ? ($data['bank_account_id'] ?? null) : null,
+                            'cash_box_id' => $payType === 1 ? ($data['cash_box_id'] ?? null) : null,
+                        ]);
+
+                        Notification::make()->title('تم تعديل الحركة بنجاح')->success()->send();
+                    }),
+                Action::make('cancelMovement')
+                    ->label('إلغاء')
+                    ->icon('heroicon-m-x-mark')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('إلغاء الحركة')
+                    ->modalDescription('سيتم إلغاء هذه الحركة وإعادة احتساب رصيد الإيجار.')
+                    ->action(function (RentTransaction $record): void {
+                        app(RentTransactionService::class)->deleteTransaction($record);
+                        Notification::make()->title('تم إلغاء الحركة بنجاح')->success()->send();
+                    }),
+            ])
             ->defaultSort(fn ($query) => $query->orderBy('transaction_date')->orderBy('id'))
             ->emptyStateHeading('لا توجد بيانات')
             ->paginated([10, 25, 50, 100])
             ->striped();
+    }
+
+    /**
+     * @return list<\Filament\Forms\Components\Component>
+     */
+    protected function movementEditSchema(RentTransaction $record): array
+    {
+        $schema = [
+            DatePicker::make('transaction_date')
+                ->label('التاريخ')
+                ->required(),
+        ];
+
+        if ($record->transaction_type === RentTransactionType::Rent) {
+            $schema[] = DatePicker::make('period_month')
+                ->label('عن شهر')
+                ->native(false)
+                ->displayFormat('Y/m')
+                ->format('Y/m')
+                ->closeOnDateSelection();
+        }
+
+        if ($record->transaction_type === RentTransactionType::Withdrawal) {
+            $schema[] = Radio::make('pay_type')
+                ->label('طريقة الدفع')
+                ->options([1 => 'نقداً', 2 => 'مصرفي'])
+                ->live();
+            $schema[] = Select::make('bank_account_id')
+                ->label('المصرف')
+                ->options(fn (): array => BankAccount::query()->orderBy('name')->pluck('name', 'id')->all())
+                ->searchable()
+                ->preload()
+                ->required()
+                ->visible(fn (Get $get): bool => (int) $get('pay_type') === 2);
+            $schema[] = Select::make('cash_box_id')
+                ->label('الخزينة')
+                ->options(fn (): array => CashBox::query()->orderBy('name')->pluck('name', 'id')->all())
+                ->searchable()
+                ->preload()
+                ->required()
+                ->visible(fn (Get $get): bool => (int) $get('pay_type') === 1);
+        }
+
+        $schema[] = TextInput::make('amount')
+            ->label('المبلغ')
+            ->numeric()
+            ->required();
+        $schema[] = TextInput::make('notes')
+            ->label('ملاحظات');
+
+        return $schema;
     }
 
     protected function buildReportQuery(): Builder
