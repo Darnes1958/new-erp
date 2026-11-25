@@ -16,12 +16,10 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 
 class ListSalaryProfiles extends ListRecords
 {
@@ -84,52 +82,93 @@ class ListSalaryProfiles extends ListRecords
                         ->danger()
                         ->send();
                 }),
-            $this->salaryMovementAction('withdraw', 'سحب', SalaryTransactionType::Withdrawal, 'heroicon-o-minus-circle', true),
-            $this->salaryMovementAction('addition', 'اضافة', SalaryTransactionType::Addition, 'heroicon-o-plus-circle', false),
-            $this->salaryMovementAction('deduction', 'خصم', SalaryTransactionType::Deduction, null, false, false),
-            Action::make('toggleActive')
-                ->label('إيقاف')
-                ->color('danger')
-                ->schema([
-                    Select::make('salary_profile_id')
-                        ->label('الاسم')
-                        ->options(fn (): array => $this->getFilteredTableQuery()->pluck('name', 'id')->all())
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        ->live()
-                        ->afterStateUpdated(function (Set $set, ?int $state): void {
-                            $set('is_active', SalaryProfile::query()->whereKey($state)->value('is_active'));
-                        }),
-                    Toggle::make('is_active')
-                        ->label('الحالة')
-                        ->visible(fn (Get $get): bool => filled($get('salary_profile_id'))),
-                ])
-                ->action(function (array $data): void {
-                    SalaryProfile::query()
-                        ->whereKey($data['salary_profile_id'])
-                        ->update(['is_active' => (bool) $data['is_active']]);
-
-                    Notification::make()->title('تم تحديث الحالة بنجاح')->success()->send();
-                }),
             Action::make('cancelMonthlySalaries')
-                ->label('إلغاء مرتب')
+                ->label('إلغاء ادراج مرتب')
                 ->color('danger')
-                ->requiresConfirmation()
+                ->modalHeading('إلغاء ادراج مرتب')
+                ->modalDescription('سيتم إلغاء إدراج المرتب لكل الموظفين عن الشهر المختار، ثم إعادة احتساب الأرصدة. السحب والإضافة والخصم لا تُمس.')
+                ->modalSubmitActionLabel('تأكيد الإلغاء')
                 ->schema([
                     Select::make('period_month')
                         ->label('عن شهر')
                         ->options(fn (): array => SalaryTransaction::query()
+                            ->where('transaction_type', SalaryTransactionType::Salary->value)
                             ->where('period_month', '!=', '0')
                             ->distinct()
                             ->orderByDesc('period_month')
                             ->pluck('period_month', 'period_month')
                             ->all())
+                        ->required()
+                        ->helperText('يُلغى الإدراج الجماعي لهذا الشهر بالكامل.'),
+                ])
+                ->action(function (array $data): void {
+                    $deleted = app(SalaryTransactionService::class)->cancelMonthlySalaries($data['period_month']);
+
+                    if ($deleted < 1) {
+                        Notification::make()->title('لا توجد مرتبات مدرجة لهذا الشهر')->warning()->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('تم إلغاء إدراج المرتبات')
+                        ->body('أُلغيت '.$deleted.' حركة، وأُعيد احتساب الأرصدة.')
+                        ->success()
+                        ->send();
+                }),
+            $this->salaryMovementAction('withdraw', 'سحب', SalaryTransactionType::Withdrawal, 'heroicon-o-minus-circle', true),
+            $this->salaryMovementAction('addition', 'اضافة', SalaryTransactionType::Addition, 'heroicon-o-plus-circle', false),
+            $this->salaryMovementAction('deduction', 'خصم', SalaryTransactionType::Deduction, null, false, false),
+            Action::make('deactivateSalary')
+                ->label('إيقاف مرتب')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading('إيقاف مرتب')
+                ->modalDescription('سيتم إيقاف الموظف المحدد ولن يُدرج له مرتب في الأشهر التالية.')
+                ->schema([
+                    Select::make('salary_profile_id')
+                        ->label('الاسم')
+                        ->options(fn (): array => $this->getFilteredTableQuery()
+                            ->where('is_active', true)
+                            ->pluck('name', 'id')
+                            ->all())
+                        ->searchable()
+                        ->preload()
                         ->required(),
                 ])
                 ->action(function (array $data): void {
-                    app(SalaryTransactionService::class)->cancelMonthlySalaries($data['period_month']);
-                    Notification::make()->title('تم إلغاء المرتب بنجاح')->success()->send();
+                    $updated = SalaryProfile::query()
+                        ->whereKey($data['salary_profile_id'])
+                        ->update(['is_active' => false]);
+
+                    if ($updated < 1) {
+                        Notification::make()->title('تعذر إيقاف المرتب')->danger()->send();
+
+                        return;
+                    }
+
+                    Notification::make()->title('تم إيقاف المرتب بنجاح')->success()->send();
+                }),
+            Action::make('activateSalary')
+                ->label('تشغيل مرتب')
+                ->color('success')
+                ->schema([
+                    Select::make('salary_profile_id')
+                        ->label('الاسم')
+                        ->options(fn (): array => $this->getFilteredTableQuery()
+                            ->where('is_active', false)
+                            ->pluck('name', 'id')
+                            ->all())
+                        ->searchable()
+                        ->preload()
+                        ->required(),
+                ])
+                ->action(function (array $data): void {
+                    SalaryProfile::query()
+                        ->whereKey($data['salary_profile_id'])
+                        ->update(['is_active' => true]);
+
+                    Notification::make()->title('تم تشغيل المرتب بنجاح')->success()->send();
                 }),
         ];
     }

@@ -18,20 +18,16 @@ class FinanceBalanceService
         }
 
         $query->each(function (SalaryProfile $profile): void {
-            $transactions = $profile->transactions();
+            $sumByType = function (SalaryTransactionType $type) use ($profile): float {
+                return (float) $profile->transactions()
+                    ->where('transaction_type', $type->value)
+                    ->sum('amount');
+            };
 
-            $withdrawals = (float) $transactions->clone()
-                ->where('transaction_type', SalaryTransactionType::Withdrawal->value)
-                ->sum('amount');
-            $deductions = (float) $transactions->clone()
-                ->where('transaction_type', SalaryTransactionType::Deduction->value)
-                ->sum('amount');
-            $salaries = (float) $transactions->clone()
-                ->where('transaction_type', SalaryTransactionType::Salary->value)
-                ->sum('amount');
-            $additions = (float) $transactions->clone()
-                ->where('transaction_type', SalaryTransactionType::Addition->value)
-                ->sum('amount');
+            $withdrawals = $sumByType(SalaryTransactionType::Withdrawal);
+            $deductions = $sumByType(SalaryTransactionType::Deduction);
+            $salaries = $sumByType(SalaryTransactionType::Salary);
+            $additions = $sumByType(SalaryTransactionType::Addition);
 
             $profile->forceFill([
                 'balance' => round($withdrawals + $deductions - $salaries - $additions, 3),

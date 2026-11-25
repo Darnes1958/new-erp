@@ -13,6 +13,7 @@
             width: 96%;
             font-size: 14px;
             border-collapse: collapse;
+            margin-right: 12px;
         }
 
         tr {
@@ -31,23 +32,50 @@
             text-align: right;
             border: 1pt solid gray;
         }
+
+        table.invoice-header {
+            width: 100%;
+            margin: 0 0 24px 0;
+            border: none;
+        }
+
+        table.invoice-header tr,
+        table.invoice-header td {
+            border: none;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
 <div>
-    @include('pdf.partials.company-header', [
-        'company' => $company,
-        'nameSize' => '24pt',
-        'suffixSize' => '18pt',
-        'addressSize' => '18pt',
-    ])
-    <br>
-    <br>
-    <label style="margin-right: 12px;">فاتورة مشتريات رقم: {{ $invoice->id }}</label>
-    <div>
-        <label style="margin-right: 12px;">بتاريخ:</label>
-        <label style="font-size: 12px;">{{ $invoice->invoice_date?->format('Y-m-d') }}</label>
-    </div>
+    <table class="invoice-header">
+        <tr>
+            <td style="width: 38%; vertical-align: top; text-align: right;">
+                @include('pdf.partials.company-header', [
+                    'company' => $company,
+                    'showLogo' => false,
+                    'nameSize' => '22pt',
+                    'suffixSize' => '11pt',
+                    'addressSize' => '11pt',
+                    'phoneSize' => '11pt',
+                ])
+            </td>
+            <td style="width: 24%; vertical-align: top; text-align: center;">
+                @php($logoSrc = $company?->logoPdfSrc())
+                @if ($logoSrc)
+                    <img src="{{ $logoSrc }}" alt="" style="max-height: 80px; max-width: 160px;">
+                @endif
+            </td>
+            <td style="width: 38%; vertical-align: top; text-align: left;">
+                <label>فاتورة مشتريات رقم: {{ $invoice->id }}</label>
+                <div>
+                    <label>بتاريخ:</label>
+                    <label style="font-size: 12px;">{{ $invoice->invoice_date?->format('Y-m-d') }}</label>
+                </div>
+            </td>
+        </tr>
+    </table>
+
     <div>
         <label style="margin-right: 12px;">اسم المورد:</label>
         <label>{{ $invoice->supplier?->name }}</label>
@@ -88,28 +116,36 @@
                 @endif
             </tr>
         @endforeach
-        </tbody>
-        <tbody>
-        @php($summaryColspan = ($hasDualUnit ? 4 : 3) - (($showBuyPrices ?? false) ? 0 : 1))
+        <tr>
+            <td colspan="2" style="text-align: left; font-weight: bold;">إجمالي الكمية</td>
+            <td style="text-align: center; font-weight: bold; background: lightgray;">{{ number_format((float) $invoice->lines->sum('qty_primary'), 3) }}</td>
+            @if ($hasDualUnit)
+                <td style="text-align: center; font-weight: bold; background: lightgray;">{{ number_format((float) $invoice->lines->sum('qty_secondary'), 3) }}</td>
+            @endif
+            @if ($showBuyPrices ?? false)
+                <td></td>
+                <td></td>
+            @endif
+        </tr>
         <tr style="border: none">
-            <td style="border: none" colspan="{{ $summaryColspan }}"></td>
+            <td style="border: none" colspan="{{ 1 + ($hasDualUnit ? 1 : 0) + (($showBuyPrices ?? false) ? 2 : 0) }}"></td>
             <td>إجمالي الفاتورة</td>
             <td style="font-weight: bold; text-align: right; background: lightgray;">{{ number_format((float) $invoice->lines_subtotal, 3) }}</td>
         </tr>
         @if ((float) $invoice->discount > 0)
             <tr style="border: none">
-                <td style="border: none" colspan="{{ $summaryColspan }}"></td>
+                <td style="border: none" colspan="{{ 1 + ($hasDualUnit ? 1 : 0) + (($showBuyPrices ?? false) ? 2 : 0) }}"></td>
                 <td>الخصم</td>
                 <td style="font-weight: bold; text-align: right; background: lightgray;">{{ number_format((float) $invoice->discount, 3) }}</td>
             </tr>
         @endif
         <tr style="border: none">
-            <td style="border: none" colspan="{{ $summaryColspan }}"></td>
+            <td style="border: none" colspan="{{ 1 + ($hasDualUnit ? 1 : 0) + (($showBuyPrices ?? false) ? 2 : 0) }}"></td>
             <td>المدفوع</td>
             <td style="font-weight: bold; text-align: right; background: lightgray;">{{ number_format((float) $invoice->amount_paid, 3) }}</td>
         </tr>
         <tr style="border: none">
-            <td style="border: none" colspan="{{ $summaryColspan }}"></td>
+            <td style="border: none" colspan="{{ 1 + ($hasDualUnit ? 1 : 0) + (($showBuyPrices ?? false) ? 2 : 0) }}"></td>
             <td>المتبقي</td>
             <td style="font-weight: bold; text-align: right; background: lightgray;">{{ number_format((float) $invoice->balance, 3) }}</td>
         </tr>
