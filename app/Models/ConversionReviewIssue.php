@@ -37,6 +37,11 @@ class ConversionReviewIssue extends CompanyModel
         return Auth::user()?->company === 'Bentaher3';
     }
 
+    public static function canAccessScreen(): bool
+    {
+        return static::isEnabledForCurrentCompany() && (bool) Auth::user()?->is_prog;
+    }
+
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);

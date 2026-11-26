@@ -29,17 +29,17 @@ class ConversionReviewIssueResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return ConversionReviewIssue::isEnabledForCurrentCompany();
+        return ConversionReviewIssue::canAccessScreen();
     }
 
     public static function canAccess(): bool
     {
-        return ConversionReviewIssue::isEnabledForCurrentCompany();
+        return ConversionReviewIssue::canAccessScreen();
     }
 
     public static function getNavigationBadge(): ?string
     {
-        if (! ConversionReviewIssue::isEnabledForCurrentCompany()) {
+        if (! ConversionReviewIssue::canAccessScreen()) {
             return null;
         }
 
