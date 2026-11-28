@@ -30,14 +30,14 @@ class PaymentAccountLedgerReportService
             ->select('cash_box_ledger_entries.*')
             ->selectRaw(
                 'COALESCE((
-                    SELECT COALESCE(cb.opening_balance, 0) + COALESCE(SUM(COALESCE(opening.daen, 0) - COALESCE(opening.mden, 0)), 0)
+                    SELECT COALESCE(cb.opening_balance, 0) + COALESCE(SUM(COALESCE(opening.mden, 0) - COALESCE(opening.daen, 0)), 0)
                     FROM cash_boxes cb
                     LEFT JOIN cash_box_ledger_entries AS opening
                         ON opening.cash_box_id = cb.id
                        AND opening.rep_date < ?
                     WHERE cb.id = ?
                     GROUP BY cb.opening_balance
-                ), 0) + SUM(COALESCE(cash_box_ledger_entries.daen, 0) - COALESCE(cash_box_ledger_entries.mden, 0))
+                ), 0) + SUM(COALESCE(cash_box_ledger_entries.mden, 0) - COALESCE(cash_box_ledger_entries.daen, 0))
                     OVER (
                         ORDER BY cash_box_ledger_entries.rep_date, cash_box_ledger_entries.idd
                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
@@ -57,14 +57,14 @@ class PaymentAccountLedgerReportService
             ->select('bank_account_ledger_entries.*')
             ->selectRaw(
                 'COALESCE((
-                    SELECT COALESCE(ba.opening_balance, 0) + COALESCE(SUM(COALESCE(opening.daen, 0) - COALESCE(opening.mden, 0)), 0)
+                    SELECT COALESCE(ba.opening_balance, 0) + COALESCE(SUM(COALESCE(opening.mden, 0) - COALESCE(opening.daen, 0)), 0)
                     FROM bank_accounts ba
                     LEFT JOIN bank_account_ledger_entries AS opening
                         ON opening.bank_account_id = ba.id
                        AND opening.rep_date < ?
                     WHERE ba.id = ?
                     GROUP BY ba.opening_balance
-                ), 0) + SUM(COALESCE(bank_account_ledger_entries.daen, 0) - COALESCE(bank_account_ledger_entries.mden, 0))
+                ), 0) + SUM(COALESCE(bank_account_ledger_entries.mden, 0) - COALESCE(bank_account_ledger_entries.daen, 0))
                     OVER (
                         ORDER BY bank_account_ledger_entries.rep_date, bank_account_ledger_entries.idd
                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
@@ -88,7 +88,7 @@ class PaymentAccountLedgerReportService
         $movementBefore = (float) CashBoxLedgerEntry::query()
             ->where('cash_box_id', $cashBoxId)
             ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('rep_date', '<', $dateFrom))
-            ->selectRaw('COALESCE(SUM(COALESCE(daen, 0) - COALESCE(mden, 0)), 0) AS balance')
+            ->selectRaw('COALESCE(SUM(COALESCE(mden, 0) - COALESCE(daen, 0)), 0) AS balance')
             ->value('balance');
 
         return round($openingBalance + $movementBefore, 3);
@@ -104,7 +104,7 @@ class PaymentAccountLedgerReportService
         $movementBefore = (float) BankAccountLedgerEntry::query()
             ->where('bank_account_id', $bankAccountId)
             ->when(filled($dateFrom), fn (Builder $query): Builder => $query->whereDate('rep_date', '<', $dateFrom))
-            ->selectRaw('COALESCE(SUM(COALESCE(daen, 0) - COALESCE(mden, 0)), 0) AS balance')
+            ->selectRaw('COALESCE(SUM(COALESCE(mden, 0) - COALESCE(daen, 0)), 0) AS balance')
             ->value('balance');
 
         return round($openingBalance + $movementBefore, 3);
@@ -186,7 +186,7 @@ class PaymentAccountLedgerReportService
         return [
             'debit' => $debit,
             'credit' => $credit,
-            'balance' => round($credit - $debit, 3),
+            'balance' => round($debit - $credit, 3),
         ];
     }
 
@@ -212,7 +212,7 @@ class PaymentAccountLedgerReportService
         return [
             'debit' => $debit,
             'credit' => $credit,
-            'balance' => round($credit - $debit, 3),
+            'balance' => round($debit - $credit, 3),
         ];
     }
 
@@ -225,7 +225,7 @@ class PaymentAccountLedgerReportService
         $running = $openingBalance;
 
         return $rows->map(function ($row) use (&$running) {
-            $running += (float) ($row->daen ?? 0) - (float) ($row->mden ?? 0);
+            $running += (float) ($row->mden ?? 0) - (float) ($row->daen ?? 0);
             $row->running_balance = round($running, 3);
 
             return $row;

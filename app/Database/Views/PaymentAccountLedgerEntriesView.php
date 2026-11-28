@@ -6,8 +6,8 @@ class PaymentAccountLedgerEntriesView
 {
     public function cashBoxSql(): string
     {
-        $mden = $this->customerReceiptMdenSql();
-        $daen = $this->customerReceiptDaenSql();
+        $mden = $this->cashAccountReceiptMdenSql();
+        $daen = $this->cashAccountReceiptDaenSql();
 
         return <<<SQL
 CREATE VIEW cash_box_ledger_entries AS
@@ -50,8 +50,8 @@ FROM (
         sp.id,
         sp.transaction_kind,
         s.name,
-        CASE WHEN sp.flow_direction = 1 THEN sp.amount ELSE CAST(0 AS decimal(14, 3)) END,
         CASE WHEN sp.flow_direction = 0 THEN sp.amount ELSE CAST(0 AS decimal(14, 3)) END,
+        CASE WHEN sp.flow_direction = 1 THEN sp.amount ELSE CAST(0 AS decimal(14, 3)) END,
         COALESCE(sp.purchase_invoice_id, sp.id),
         sp.notes,
         CAST(3 AS int),
@@ -68,8 +68,8 @@ FROM (
         e.id,
         CAST(30 AS int),
         et.name,
-        e.amount,
         CAST(0 AS decimal(14, 3)),
+        e.amount,
         e.id,
         e.notes,
         CAST(4 AS int),
@@ -86,8 +86,8 @@ FROM (
         st.id,
         CAST(31 AS int),
         sp.name,
-        st.amount,
         CAST(0 AS decimal(14, 3)),
+        st.amount,
         st.id,
         st.notes,
         CAST(5 AS int),
@@ -104,8 +104,8 @@ FROM (
         rt.id,
         CAST(32 AS int),
         rp.name,
-        rt.amount,
         CAST(0 AS decimal(14, 3)),
+        rt.amount,
         rt.id,
         rt.notes,
         CAST(6 AS int),
@@ -122,8 +122,8 @@ FROM (
         ft.id,
         CAST(33 AS int),
         N'تحويل صادر',
-        ft.amount,
         CAST(0 AS decimal(14, 3)),
+        ft.amount,
         ft.id,
         ft.notes,
         CAST(7 AS int),
@@ -139,8 +139,8 @@ FROM (
         ft.id,
         CAST(34 AS int),
         N'تحويل وارد',
-        CAST(0 AS decimal(14, 3)),
         ft.amount,
+        CAST(0 AS decimal(14, 3)),
         ft.id,
         ft.notes,
         CAST(8 AS int),
@@ -153,8 +153,8 @@ SQL;
 
     public function bankAccountSql(?string $connection = null): string
     {
-        $mden = $this->customerReceiptMdenSql();
-        $daen = $this->customerReceiptDaenSql();
+        $mden = $this->cashAccountReceiptMdenSql();
+        $daen = $this->cashAccountReceiptDaenSql();
 
         return <<<SQL
 CREATE VIEW bank_account_ledger_entries AS
@@ -197,8 +197,8 @@ FROM (
         sp.id,
         sp.transaction_kind,
         s.name,
-        CASE WHEN sp.flow_direction = 1 THEN sp.amount ELSE CAST(0 AS decimal(14, 3)) END,
         CASE WHEN sp.flow_direction = 0 THEN sp.amount ELSE CAST(0 AS decimal(14, 3)) END,
+        CASE WHEN sp.flow_direction = 1 THEN sp.amount ELSE CAST(0 AS decimal(14, 3)) END,
         COALESCE(sp.purchase_invoice_id, sp.id),
         sp.notes,
         CAST(3 AS int),
@@ -215,8 +215,8 @@ FROM (
         e.id,
         CAST(30 AS int),
         et.name,
-        e.amount,
         CAST(0 AS decimal(14, 3)),
+        e.amount,
         e.id,
         e.notes,
         CAST(4 AS int),
@@ -233,8 +233,8 @@ FROM (
         st.id,
         CAST(31 AS int),
         sp.name,
-        st.amount,
         CAST(0 AS decimal(14, 3)),
+        st.amount,
         st.id,
         st.notes,
         CAST(5 AS int),
@@ -251,8 +251,8 @@ FROM (
         rt.id,
         CAST(32 AS int),
         rp.name,
-        rt.amount,
         CAST(0 AS decimal(14, 3)),
+        rt.amount,
         rt.id,
         rt.notes,
         CAST(6 AS int),
@@ -269,8 +269,8 @@ FROM (
         ft.id,
         CAST(33 AS int),
         N'تحويل صادر',
-        ft.amount,
         CAST(0 AS decimal(14, 3)),
+        ft.amount,
         ft.id,
         ft.notes,
         CAST(7 AS int),
@@ -286,8 +286,8 @@ FROM (
         ft.id,
         CAST(34 AS int),
         N'تحويل وارد',
-        CAST(0 AS decimal(14, 3)),
         ft.amount,
+        CAST(0 AS decimal(14, 3)),
         ft.id,
         ft.notes,
         CAST(8 AS int),
@@ -298,13 +298,13 @@ FROM (
 SQL;
     }
 
-    protected function customerReceiptMdenSql(): string
-    {
-        return 'CASE WHEN cr.transaction_kind IN (2, 4, 5) THEN cr.amount ELSE CAST(0 AS decimal(14, 3)) END';
-    }
-
-    protected function customerReceiptDaenSql(): string
+    protected function cashAccountReceiptMdenSql(): string
     {
         return 'CASE WHEN cr.transaction_kind IN (1, 3, 6) THEN cr.amount ELSE CAST(0 AS decimal(14, 3)) END';
+    }
+
+    protected function cashAccountReceiptDaenSql(): string
+    {
+        return 'CASE WHEN cr.transaction_kind IN (2, 4, 5) THEN cr.amount ELSE CAST(0 AS decimal(14, 3)) END';
     }
 }
