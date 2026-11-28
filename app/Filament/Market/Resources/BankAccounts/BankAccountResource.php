@@ -108,7 +108,7 @@ class BankAccountResource extends Resource
                         || Expense::query()->where('bank_account_id', $record->id)->exists()
                         || SalaryTransaction::query()->where('bank_account_id', $record->id)->exists()
                         || FundTransfer::query()->where('from_bank_account_id', $record->id)->orWhere('to_bank_account_id', $record->id)->exists()
-                        || PayrollBank::query()->where('bank_account_id', $record->id)->exists()),
+                        || PayrollBank::isLinkedToBankAccount((int) $record->id)),
             ]);
     }
 
